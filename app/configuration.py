@@ -9,6 +9,7 @@ class Config:
     DEBUG = False
     TESTING = False
     BOOTSTRAP_FONTAWESOME = True
+    BOOTSTRAP_SERVE_LOCAL = True
     SECRET_KEY = "***REMOVED***"
     SECURITY_PASSWORD_SALT = "***REMOVED***"
     CSRF_ENABLED = True
