@@ -38,7 +38,28 @@ CHUNK_OVERLAP = 200
 
 
 def get_chroma_client(host: str | None) -> chromadb.ClientAPI:
-    """Create a ChromaDB client — HTTP if host is given, PersistentClient otherwise."""
+    """Create a ChromaDB client.
+
+    Resolution order:
+      1. Explicit --chroma-host flag
+      2. CHROMADB_HOST env var
+      3. Try 'chromadb:8000' (Docker Compose service name)
+      4. Fall back to PersistentClient (local dev)
+    """
+    import os
+    import socket
+
+    if not host:
+        host = os.environ.get("CHROMADB_HOST")
+
+    if not host:
+        # Inside Docker Compose the service name 'chromadb' resolves
+        try:
+            socket.getaddrinfo("chromadb", 8000)
+            host = "chromadb:8000"
+        except socket.gaierror:
+            pass
+
     if host:
         parts = host.split(":")
         hostname = parts[0]
