@@ -174,7 +174,7 @@ async def main(chroma_host: str | None) -> None:
                 total_failed += 1
 
         await recalculate_stats(kb)
-        await kb.reload()
+        kb = await KnowledgeBase.get(kb.id)
         logger.info("  KB %r: %d → %d chunks", kb.title, kb_chunks_before, kb.total_chunks)
 
     logger.info("Done. Re-chunked: %d, Failed/skipped: %d",
