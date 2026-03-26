@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { X, FolderOpen, Globe, Loader2, Plus } from 'lucide-react'
+import { X, FolderOpen, Globe, Loader2, Plus, ChevronRight } from 'lucide-react'
 import { createAutomation } from '../../api/automations'
 import { createFolder } from '../../api/folders'
 import { apiFetch } from '../../api/client'
+import { ItemPickerModal } from './ItemPickerModal'
 import type { ActionType, TriggerType } from '../../types/automation'
 import type { Workflow } from '../../types/workflow'
 
@@ -35,6 +36,8 @@ export function AutomationCreationWizard({ onClose, onCreate, workflows, searchS
   const [triggerType, setTriggerType] = useState<TriggerType>('folder_watch')
   const [actionType, setActionType] = useState<ActionType>('workflow')
   const [actionId, setActionId] = useState('')
+  const [actionName, setActionName] = useState('')
+  const [showPicker, setShowPicker] = useState(false)
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const nameRef = useRef<HTMLInputElement>(null)
@@ -97,6 +100,7 @@ export function AutomationCreationWizard({ onClose, onCreate, workflows, searchS
   const handleActionTypeChange = (type: ActionType) => {
     setActionType(type)
     setActionId('')
+    setActionName('')
   }
 
   // When trigger type changes away from folder_watch, reset folder config and
@@ -516,45 +520,38 @@ export function AutomationCreationWizard({ onClose, onCreate, workflows, searchS
               </div>
 
               {/* Action selector */}
-              {actionType === 'workflow' && (
+              {(actionType === 'workflow' || actionType === 'extraction' || actionType === 'task') && (
                 <div>
                   <label style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', display: 'block', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                    Select Workflow <span style={{ color: '#ef4444' }}>*</span>
+                    Select {actionType === 'extraction' ? 'Extraction' : actionType === 'task' ? 'Workflow Task' : 'Workflow'} <span style={{ color: '#ef4444' }}>*</span>
                   </label>
-                  <select value={actionId} onChange={e => setActionId(e.target.value)} style={selectStyle}>
-                    <option value="">— choose a workflow —</option>
-                    {workflows.map(wf => <option key={wf.id} value={wf.id}>{wf.name}</option>)}
-                  </select>
-                  {workflows.length === 0 && (
-                    <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 6 }}>No workflows yet — you can create one in the Workflows panel.</div>
+                  <button
+                    onClick={() => setShowPicker(true)}
+                    style={{
+                      width: '100%', padding: '10px 14px', fontSize: 14,
+                      border: '1.5px solid #d1d5db', borderRadius: 8, fontFamily: 'inherit',
+                      backgroundColor: '#fff', color: actionId ? '#111827' : '#9ca3af',
+                      cursor: 'pointer', textAlign: 'left',
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    }}
+                  >
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {actionName || `Browse ${actionType === 'extraction' ? 'extractions' : 'workflows'}...`}
+                    </span>
+                    <ChevronRight size={16} style={{ color: '#9ca3af', flexShrink: 0 }} />
+                  </button>
+                  {showPicker && (
+                    <ItemPickerModal
+                      kind={actionType === 'extraction' ? 'extraction' : 'workflow'}
+                      currentId={actionId}
+                      onSelect={(id, name) => {
+                        setActionId(id)
+                        setActionName(name)
+                        setShowPicker(false)
+                      }}
+                      onClose={() => setShowPicker(false)}
+                    />
                   )}
-                </div>
-              )}
-
-              {actionType === 'extraction' && (
-                <div>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', display: 'block', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                    Select Extraction <span style={{ color: '#ef4444' }}>*</span>
-                  </label>
-                  <select value={actionId} onChange={e => setActionId(e.target.value)} style={selectStyle}>
-                    <option value="">— choose an extraction —</option>
-                    {searchSets.map(ss => <option key={ss.uuid} value={ss.uuid}>{ss.title}</option>)}
-                  </select>
-                  {searchSets.length === 0 && (
-                    <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 6 }}>No extractions yet — you can create one in the Extractions panel.</div>
-                  )}
-                </div>
-              )}
-
-              {actionType === 'task' && (
-                <div>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', display: 'block', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                    Select Workflow Task <span style={{ color: '#ef4444' }}>*</span>
-                  </label>
-                  <select value={actionId} onChange={e => setActionId(e.target.value)} style={selectStyle}>
-                    <option value="">— choose a workflow —</option>
-                    {workflows.map(wf => <option key={wf.id} value={wf.id}>{wf.name}</option>)}
-                  </select>
                 </div>
               )}
             </div>

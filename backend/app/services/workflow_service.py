@@ -51,17 +51,35 @@ async def list_workflows(
     user: User,
     skip: int = 0,
     limit: int = 100,
+    scope: str | None = None,
+    search: str | None = None,
 ) -> list[Workflow]:
     team_access = await get_team_access_context(user)
 
-    # Build OR query: owned by user OR belongs to one of user's teams
-    conditions: list[dict] = [{"user_id": user.user_id}]
-    if team_access.team_uuids:
-        conditions.append({"team_id": {"$in": list(team_access.team_uuids)}})
-    if team_access.team_object_ids:
-        conditions.append({"team_id": {"$in": list(team_access.team_object_ids)}})
+    # Build query based on scope
+    if scope == "mine":
+        conditions: list[dict] = [{"user_id": user.user_id}]
+    elif scope == "team":
+        conditions = []
+        if team_access.team_uuids:
+            conditions.append({"team_id": {"$in": list(team_access.team_uuids)}})
+        if team_access.team_object_ids:
+            conditions.append({"team_id": {"$in": list(team_access.team_object_ids)}})
+        if not conditions:
+            return []
+    else:
+        # Default: owned by user OR belongs to one of user's teams
+        conditions = [{"user_id": user.user_id}]
+        if team_access.team_uuids:
+            conditions.append({"team_id": {"$in": list(team_access.team_uuids)}})
+        if team_access.team_object_ids:
+            conditions.append({"team_id": {"$in": list(team_access.team_object_ids)}})
 
-    query: dict = {"$or": conditions}
+    query: dict = {"$or": conditions} if conditions else {}
+
+    # Add text search filter
+    if search:
+        query["name"] = {"$regex": search, "$options": "i"}
 
     return await Workflow.find(query).skip(skip).limit(limit).to_list()
 

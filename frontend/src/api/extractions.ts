@@ -10,8 +10,12 @@ export function createSearchSet(data: { title: string; set_type?: string; extrac
   })
 }
 
-export function listSearchSets() {
-  return apiFetch<SearchSet[]>('/api/extractions/search-sets')
+export function listSearchSets(params?: { scope?: string; search?: string }) {
+  const sp = new URLSearchParams()
+  if (params?.scope) sp.set('scope', params.scope)
+  if (params?.search) sp.set('search', params.search)
+  const qs = sp.toString()
+  return apiFetch<SearchSet[]>(`/api/extractions/search-sets${qs ? `?${qs}` : ''}`)
 }
 
 export function getSearchSet(uuid: string) {

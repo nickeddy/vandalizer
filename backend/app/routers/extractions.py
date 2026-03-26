@@ -139,9 +139,11 @@ async def create_search_set(req: CreateSearchSetRequest, user: User = Depends(ge
 async def list_search_sets(
     skip: int = Query(default=0, ge=0),
     limit: int = Query(default=100, ge=1, le=500),
+    scope: str | None = Query(default=None),
+    search: str | None = Query(default=None),
     user: User = Depends(get_current_user),
 ):
-    sets = await svc.list_search_sets(user=user, skip=skip, limit=limit)
+    sets = await svc.list_search_sets(user=user, skip=skip, limit=limit, scope=scope, search=search)
     return [await _ss_response(ss) for ss in sets]
 
 

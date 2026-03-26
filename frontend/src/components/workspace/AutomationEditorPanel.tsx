@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { X, Pencil, Trash2, FolderOpen, Globe, Copy, Check } from 'lucide-react'
+import { X, Pencil, Trash2, FolderOpen, Globe, Copy, Check, ChevronRight } from 'lucide-react'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { getAutomation, updateAutomation, deleteAutomation } from '../../api/automations'
 import { apiFetch } from '../../api/client'
 import { useWorkflows } from '../../hooks/useWorkflows'
 import { useSearchSets } from '../../hooks/useExtractions'
+import { ItemPickerModal } from './ItemPickerModal'
 import type { Automation, TriggerType, ActionType } from '../../types/automation'
 
 const TRIGGER_OPTIONS: { value: TriggerType; label: string; icon: typeof FolderOpen; description: string }[] = [
@@ -24,6 +25,7 @@ export function AutomationEditorPanel() {
   const { searchSets } = useSearchSets()
   const [automation, setAutomation] = useState<Automation | null>(null)
   const [loading, setLoading] = useState(true)
+  const [showActionPicker, setShowActionPicker] = useState(false)
   const [editingTitle, setEditingTitle] = useState(false)
   const [titleValue, setTitleValue] = useState('')
   const titleInputRef = useRef<HTMLInputElement>(null)
@@ -311,69 +313,54 @@ export function AutomationEditorPanel() {
         </div>
 
         {/* Action selector */}
-        {automation.action_type === 'workflow' && (
-          <div style={{ marginTop: 16, padding: '16px', backgroundColor: '#f9fafb', borderRadius: 8, border: '1px solid #e5e7eb' }}>
-            <label style={{ fontSize: 13, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 8 }}>
-              Select Workflow
-            </label>
-            <select
-              value={automation.action_id || ''}
-              onChange={e => handleActionSelect(e.target.value)}
-              style={{
-                width: '100%', padding: '8px 12px', fontSize: 13,
-                border: '1px solid #d1d5db', borderRadius: 6, fontFamily: 'inherit',
-                backgroundColor: '#fff', color: '#202124', outline: 'none',
-              }}
-            >
-              <option value="">-- Select a workflow --</option>
-              {workflows.map(wf => (
-                <option key={wf.id} value={wf.id}>{wf.name}</option>
-              ))}
-            </select>
-          </div>
-        )}
-        {automation.action_type === 'extraction' && (
-          <div style={{ marginTop: 16, padding: '16px', backgroundColor: '#f9fafb', borderRadius: 8, border: '1px solid #e5e7eb' }}>
-            <label style={{ fontSize: 13, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 8 }}>
-              Select Extraction
-            </label>
-            <select
-              value={automation.action_id || ''}
-              onChange={e => handleActionSelect(e.target.value)}
-              style={{
-                width: '100%', padding: '8px 12px', fontSize: 13,
-                border: '1px solid #d1d5db', borderRadius: 6, fontFamily: 'inherit',
-                backgroundColor: '#fff', color: '#202124', outline: 'none',
-              }}
-            >
-              <option value="">-- Select an extraction --</option>
-              {searchSets.map(ss => (
-                <option key={ss.uuid} value={ss.uuid}>{ss.title}</option>
-              ))}
-            </select>
-          </div>
-        )}
-        {automation.action_type === 'task' && (
-          <div style={{ marginTop: 16, padding: '16px', backgroundColor: '#f9fafb', borderRadius: 8, border: '1px solid #e5e7eb' }}>
-            <label style={{ fontSize: 13, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 8 }}>
-              Select Workflow Task
-            </label>
-            <select
-              value={automation.action_id || ''}
-              onChange={e => handleActionSelect(e.target.value)}
-              style={{
-                width: '100%', padding: '8px 12px', fontSize: 13,
-                border: '1px solid #d1d5db', borderRadius: 6, fontFamily: 'inherit',
-                backgroundColor: '#fff', color: '#202124', outline: 'none',
-              }}
-            >
-              <option value="">-- Select a workflow --</option>
-              {workflows.map(wf => (
-                <option key={wf.id} value={wf.id}>{wf.name}</option>
-              ))}
-            </select>
-          </div>
-        )}
+        {(automation.action_type === 'workflow' || automation.action_type === 'extraction' || automation.action_type === 'task') && (() => {
+          const actionKind = automation.action_type === 'extraction' ? 'extraction' : 'workflow'
+          const kindLabel = automation.action_type === 'extraction' ? 'Extraction' : automation.action_type === 'task' ? 'Workflow Task' : 'Workflow'
+          // Resolve current action name from loaded data
+          let currentName = ''
+          if (automation.action_id) {
+            if (automation.action_type === 'extraction') {
+              const ss = searchSets.find(s => s.uuid === automation.action_id)
+              currentName = ss?.title || ''
+            } else {
+              const wf = workflows.find(w => w.id === automation.action_id)
+              currentName = wf?.name || ''
+            }
+          }
+          return (
+            <div style={{ marginTop: 16, padding: '16px', backgroundColor: '#f9fafb', borderRadius: 8, border: '1px solid #e5e7eb' }}>
+              <label style={{ fontSize: 13, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 8 }}>
+                Select {kindLabel}
+              </label>
+              <button
+                onClick={() => setShowActionPicker(true)}
+                style={{
+                  width: '100%', padding: '10px 14px', fontSize: 13,
+                  border: '1.5px solid #d1d5db', borderRadius: 8, fontFamily: 'inherit',
+                  backgroundColor: '#fff', color: currentName ? '#111827' : '#9ca3af',
+                  cursor: 'pointer', textAlign: 'left',
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                }}
+              >
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {currentName || `Browse ${actionKind === 'extraction' ? 'extractions' : 'workflows'}...`}
+                </span>
+                <ChevronRight size={16} style={{ color: '#9ca3af', flexShrink: 0 }} />
+              </button>
+              {showActionPicker && (
+                <ItemPickerModal
+                  kind={actionKind}
+                  currentId={automation.action_id || undefined}
+                  onSelect={(id) => {
+                    handleActionSelect(id)
+                    setShowActionPicker(false)
+                  }}
+                  onClose={() => setShowActionPicker(false)}
+                />
+              )}
+            </div>
+          )
+        })()}
 
         {/* Section C — Post-Action Output */}
         <SectionLabel>Post-Action Output</SectionLabel>

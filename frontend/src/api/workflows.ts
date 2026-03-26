@@ -7,8 +7,12 @@ export function createWorkflow(data: { name: string; description?: string }) {
   return apiFetch<Workflow>('/api/workflows', { method: 'POST', body: JSON.stringify(data) })
 }
 
-export function listWorkflows() {
-  return apiFetch<Workflow[]>('/api/workflows')
+export function listWorkflows(params?: { scope?: string; search?: string }) {
+  const sp = new URLSearchParams()
+  if (params?.scope) sp.set('scope', params.scope)
+  if (params?.search) sp.set('search', params.search)
+  const qs = sp.toString()
+  return apiFetch<Workflow[]>(`/api/workflows${qs ? `?${qs}` : ''}`)
 }
 
 export function getWorkflow(id: string) {

@@ -74,9 +74,11 @@ async def create_workflow(req: CreateWorkflowRequest, user: User = Depends(get_c
 async def list_workflows(
     skip: int = Query(default=0, ge=0),
     limit: int = Query(default=100, ge=1, le=500),
+    scope: str | None = Query(default=None),
+    search: str | None = Query(default=None),
     user: User = Depends(get_current_user),
 ):
-    workflows = await svc.list_workflows(user=user, skip=skip, limit=limit)
+    workflows = await svc.list_workflows(user=user, skip=skip, limit=limit, scope=scope, search=search)
     return [
         WorkflowResponse(
             id=str(wf.id), name=wf.name, description=wf.description,

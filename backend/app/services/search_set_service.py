@@ -48,40 +48,40 @@ async def list_search_sets(
     user: User | None = None,
     skip: int = 0,
     limit: int = 100,
+    scope: str | None = None,
+    search: str | None = None,
 ) -> list[SearchSet]:
     if user is None:
         return await SearchSet.find().skip(skip).limit(limit).to_list()
 
     team_access = await access_control.get_team_access_context(user)
 
-    # Build OR query: owned by user OR belongs to one of user's teams OR global
-    conditions: list[dict] = [{"user_id": user.user_id}, {"is_global": True}]
-    if team_access.team_uuids:
-        conditions.append({"team_id": {"$in": list(team_access.team_uuids)}})
-    if team_access.team_object_ids:
-        conditions.append({"team_id": {"$in": list(team_access.team_object_ids)}})
+    # Build query based on scope
+    if scope == "mine":
+        conditions: list[dict] = [{"user_id": user.user_id}]
+    elif scope == "team":
+        conditions = []
+        if team_access.team_uuids:
+            conditions.append({"team_id": {"$in": list(team_access.team_uuids)}})
+        if team_access.team_object_ids:
+            conditions.append({"team_id": {"$in": list(team_access.team_object_ids)}})
+        if not conditions:
+            return []
+    else:
+        # Default: owned by user OR belongs to one of user's teams OR global
+        conditions = [{"user_id": user.user_id}, {"is_global": True}]
+        if team_access.team_uuids:
+            conditions.append({"team_id": {"$in": list(team_access.team_uuids)}})
+        if team_access.team_object_ids:
+            conditions.append({"team_id": {"$in": list(team_access.team_object_ids)}})
 
-    search_sets = await SearchSet.find({"$or": conditions}).skip(skip).limit(limit).to_list()
+    query: dict = {"$or": conditions} if conditions else {}
 
-    # Also check library-backed access for any we might have missed
-    visible: list[SearchSet] = []
-    for search_set in search_sets:
-        visible.append(search_set)
+    # Add text search filter
+    if search:
+        query["title"] = {"$regex": search, "$options": "i"}
 
-    # Check for library-backed access to additional search sets
-    all_sets = await SearchSet.find().skip(skip).limit(limit).to_list()
-    visible_ids = {str(ss.id) for ss in visible}
-    for search_set in all_sets:
-        if str(search_set.id) in visible_ids:
-            continue
-        if await access_control.has_library_backed_object_access(
-            "search_set",
-            str(search_set.id),
-            user,
-            team_access,
-        ):
-            visible.append(search_set)
-    return visible
+    return await SearchSet.find(query).skip(skip).limit(limit).to_list()
 
 
 async def get_search_set(search_set_uuid: str) -> SearchSet | None:
