@@ -67,11 +67,15 @@ async def list_workflows(
             return []
         query = {"team_id": current_team}
     else:
-        # Default: user's own OR current team items
-        conditions: list[dict] = [{"user_id": user.user_id}]
+        # Default: user's own (in current team) + all current team items
         if current_team:
-            conditions.append({"team_id": current_team})
-        query = {"$or": conditions}
+            conditions: list[dict] = [
+                {"user_id": user.user_id, "team_id": {"$in": [current_team, None]}},
+                {"team_id": current_team},
+            ]
+            query = {"$or": conditions}
+        else:
+            query = {"user_id": user.user_id}
 
     # Add text search filter
     if search:
