@@ -9,6 +9,7 @@
 #    ./setup.sh --upgrade   Pull latest code, backup, rebuild, and redeploy
 #    ./setup.sh --redeploy  Rebuild and restart from current code (no git pull)
 #    ./setup.sh --seed      Update verified catalog (add new seed data)
+#    ./setup.sh --reingest  Re-ingest all knowledge base content into ChromaDB
 # ============================================================================
 
 set -uo pipefail
@@ -1532,6 +1533,47 @@ update_catalog() {
 }
 
 # ---------------------------------------------------------------------------
+# Re-ingest knowledge bases: rebuild ChromaDB chunks from stored content
+# ---------------------------------------------------------------------------
+reingest_knowledge_bases() {
+  section "K" "Re-ingest Knowledge Bases"
+
+  echo -e "  ${DIM}     Re-ingesting all knowledge base sources into ChromaDB.${RESET}"
+  echo -e "  ${DIM}     Sources with stored content are re-chunked directly (no re-fetch).${RESET}"
+  echo -e "  ${DIM}     Sources without content will be re-fetched from their URLs.${RESET}"
+  echo ""
+
+  # Find the API container
+  local container_name
+  container_name=$($COMPOSE_CMD ps --format '{{.Names}}' 2>/dev/null | grep -E '(api|backend)' | grep -v celery | head -1 || true)
+
+  if [[ -z "$container_name" ]]; then
+    echo -e "  ${SYM_CROSS}  ${RED}API container is not running.${RESET}"
+    echo -e "  ${DIM}     Start services first: docker compose up -d${RESET}"
+    return 1
+  fi
+
+  echo -e "  ${SYM_ARROW}  Using container: ${BOLD}${container_name}${RESET}"
+  echo ""
+
+  local reingest_output
+  if reingest_output=$(docker exec "$container_name" python -m scripts.reingest_knowledge_bases 2>&1); then
+    while IFS= read -r line; do
+      echo -e "  ${DIM}     ${line}${RESET}"
+    done <<< "$reingest_output"
+    echo ""
+    echo -e "  ${SYM_CHECK}  ${BRIGHT_GREEN}${BOLD}Knowledge bases re-ingested.${RESET}"
+  else
+    while IFS= read -r line; do
+      echo -e "  ${DIM}     ${line}${RESET}"
+    done <<< "$reingest_output"
+    echo ""
+    echo -e "  ${SYM_CROSS}  ${RED}Re-ingestion failed. Check output above.${RESET}"
+    return 1
+  fi
+}
+
+# ---------------------------------------------------------------------------
 # Detect existing deployment
 # ---------------------------------------------------------------------------
 detect_deployment() {
@@ -1578,6 +1620,13 @@ main() {
       echo ""
       exit 0
       ;;
+    --reingest|reingest)
+      show_banner
+      preflight
+      reingest_knowledge_bases
+      echo ""
+      exit 0
+      ;;
     --help|-h|help)
       echo ""
       echo -e "  ${BOLD}Usage:${RESET} ./setup.sh [command]"
@@ -1588,6 +1637,7 @@ main() {
       echo -e "    ${CYAN}--upgrade${RESET}    Pull new code, backup, rebuild, and redeploy"
       echo -e "    ${CYAN}--redeploy${RESET}   Rebuild and restart from current code (no git pull)"
       echo -e "    ${CYAN}--seed${RESET}       Update verified catalog with new seed data"
+      echo -e "    ${CYAN}--reingest${RESET}   Re-ingest all knowledge base content into ChromaDB"
       echo -e "    ${CYAN}--help${RESET}       Show this help"
       echo ""
       exit 0
@@ -1607,6 +1657,7 @@ main() {
     echo -e "  ${DIM}  3)${RESET} ${CYAN}Redeploy${RESET}     ${DIM}— rebuild and restart from current code${RESET}"
     echo -e "  ${DIM}  4)${RESET} ${CYAN}Full setup${RESET}   ${DIM}— reconfigure everything from scratch${RESET}"
     echo -e "  ${DIM}  5)${RESET} ${CYAN}Seed catalog${RESET} ${DIM}— update verified catalog with new seed data${RESET}"
+    echo -e "  ${DIM}  6)${RESET} ${CYAN}Re-ingest KBs${RESET} ${DIM}— rebuild knowledge base content in ChromaDB${RESET}"
     echo ""
     echo -ne "  ${SYM_ARROW}  Select mode ${DIM}[1]${RESET}: "
     local mode_choice
@@ -1618,6 +1669,7 @@ main() {
       3) redeploy; echo ""; exit 0 ;;
       4) ;; # fall through to full setup
       5) update_catalog; echo ""; exit 0 ;;
+      6) reingest_knowledge_bases; echo ""; exit 0 ;;
       *) repair; echo ""; exit 0 ;;
     esac
   fi
