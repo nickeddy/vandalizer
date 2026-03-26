@@ -43,6 +43,8 @@ def _split_text(text: str, chunk_size: int, chunk_overlap: int) -> list[str]:
             next_start = end
         start = next_start
 
+    return chunks
+
 
 class DocumentManager:
     """Synchronous document manager  - safe to call from asyncio.to_thread()."""
