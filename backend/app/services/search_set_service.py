@@ -13,7 +13,6 @@ from app.models.search_set import SearchSet, SearchSetItem
 from app.models.system_config import SystemConfig
 from app.services.config_service import get_user_model_name
 from app.services.extraction_engine import ExtractionEngine
-from app.services import access_control
 
 if TYPE_CHECKING:
     from app.models.user import User
@@ -54,28 +53,24 @@ async def list_search_sets(
     if user is None:
         return await SearchSet.find().skip(skip).limit(limit).to_list()
 
-    team_access = await access_control.get_team_access_context(user)
+    # Scope queries to the user's current team (matches Library behavior)
+    current_team = str(user.current_team) if user.current_team else None
 
-    # Build query based on scope
     if scope == "mine":
-        conditions: list[dict] = [{"user_id": user.user_id}]
+        # User's own search sets within the current team
+        query: dict = {"user_id": user.user_id}
+        if current_team:
+            query["team_id"] = {"$in": [current_team, None]}
     elif scope == "team":
-        conditions = []
-        if team_access.team_uuids:
-            conditions.append({"team_id": {"$in": list(team_access.team_uuids)}})
-        if team_access.team_object_ids:
-            conditions.append({"team_id": {"$in": list(team_access.team_object_ids)}})
-        if not conditions:
+        if not current_team:
             return []
+        query = {"team_id": current_team}
     else:
-        # Default: owned by user OR belongs to one of user's teams OR global
-        conditions = [{"user_id": user.user_id}, {"is_global": True}]
-        if team_access.team_uuids:
-            conditions.append({"team_id": {"$in": list(team_access.team_uuids)}})
-        if team_access.team_object_ids:
-            conditions.append({"team_id": {"$in": list(team_access.team_object_ids)}})
-
-    query: dict = {"$or": conditions} if conditions else {}
+        # Default: user's own OR current team items
+        conditions: list[dict] = [{"user_id": user.user_id}]
+        if current_team:
+            conditions.append({"team_id": current_team})
+        query = {"$or": conditions}
 
     # Add text search filter
     if search:
