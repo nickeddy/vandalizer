@@ -29,7 +29,10 @@ async def _authorize_submission_target(item_kind: str, item_id: str, user: User)
     elif item_kind == "search_set":
         obj = await access_control.get_authorized_search_set(item_id, user)
     elif item_kind == "knowledge_base":
-        obj = await access_control.get_authorized_knowledge_base(item_id, user)
+        # item_id may be an ObjectId or a UUID — try both
+        obj = await access_control.get_authorized_knowledge_base_by_id(item_id, user)
+        if not obj:
+            obj = await access_control.get_authorized_knowledge_base(item_id, user)
     else:
         raise HTTPException(status_code=400, detail=f"Unsupported item_kind: {item_kind}")
 

@@ -41,7 +41,14 @@ async def submit_for_verification(
     """Create a verification request for a library item."""
     # Look up by uuid string for knowledge_base and search_set; ObjectId for others
     if item_kind == "knowledge_base":
-        obj = await KnowledgeBase.find_one(KnowledgeBase.uuid == item_id)
+        # item_id may be an ObjectId or a UUID — try both
+        try:
+            obj_id = PydanticObjectId(item_id)
+            obj = await KnowledgeBase.get(obj_id)
+        except Exception:
+            obj = None
+        if not obj:
+            obj = await KnowledgeBase.find_one(KnowledgeBase.uuid == item_id)
         if not obj:
             raise ValueError("Item not found")
         obj_id = obj.id
