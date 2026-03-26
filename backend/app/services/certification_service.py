@@ -346,6 +346,29 @@ async def complete_module(user_id: str, module_id: str) -> dict:
 # Helper: collect extraction field names from a user's workflows
 # ---------------------------------------------------------------------------
 
+async def _resolve_extraction_field_names(task_data: dict) -> list[str]:
+    """Resolve extraction field names from a task's data dict.
+
+    Fields can come from a linked SearchSet (search_set_uuid) or be stored
+    inline as ``searchphrases`` (list or comma-separated string) / ``keys``.
+    """
+    # Try linked SearchSet first
+    ss_id = task_data.get("search_set_uuid")
+    if ss_id:
+        items = await SearchSetItem.find(SearchSetItem.searchset == ss_id).to_list()
+        names = [item.searchphrase for item in items if item.searchphrase]
+        if names:
+            return names
+
+    # Fall back to inline searchphrases / keys
+    raw = task_data.get("searchphrases") or task_data.get("keys") or []
+    if isinstance(raw, str):
+        return [s.strip() for s in raw.split(",") if s.strip()]
+    if isinstance(raw, list):
+        return [str(s).strip() for s in raw if s]
+    return []
+
+
 async def _get_extraction_fields(workflows: list) -> tuple[int, list[str]]:
     """Returns (max_field_count, all_field_names) across all extraction tasks."""
     max_fields = 0
@@ -358,13 +381,10 @@ async def _get_extraction_fields(workflows: list) -> tuple[int, list[str]]:
             for task_id in step.tasks:
                 task = await WorkflowStepTask.get(task_id)
                 if task and task.name == "Extraction":
-                    ss_id = (task.data or {}).get("search_set_uuid")
-                    if ss_id:
-                        items = await SearchSetItem.find(SearchSetItem.searchset == ss_id).to_list()
-                        field_names = [item.searchphrase for item in items if item.searchphrase]
-                        if len(items) > max_fields:
-                            max_fields = len(items)
-                            all_field_names = field_names
+                    field_names = await _resolve_extraction_field_names(task.data or {})
+                    if len(field_names) > max_fields:
+                        max_fields = len(field_names)
+                        all_field_names = field_names
     return max_fields, all_field_names
 
 
@@ -454,16 +474,13 @@ async def _validate_foundations(user_id: str) -> dict:
                 task = await WorkflowStepTask.get(task_id)
                 if task and task.name == "Extraction":
                     has_extraction_workflow = True
-                    ss_id = (task.data or {}).get("search_set_uuid")
-                    if ss_id:
-                        items = await SearchSetItem.find(SearchSetItem.searchset == ss_id).to_list()
-                        field_names = [item.searchphrase for item in items if item.searchphrase]
-                        if len(items) > extraction_field_count:
-                            extraction_field_count = len(items)
-                            matched_fields = [
-                                ef for ef in expected_fields
-                                if _fuzzy_field_match(ef, field_names)
-                            ]
+                    field_names = await _resolve_extraction_field_names(task.data or {})
+                    if len(field_names) > extraction_field_count:
+                        extraction_field_count = len(field_names)
+                        matched_fields = [
+                            ef for ef in expected_fields
+                            if _fuzzy_field_match(ef, field_names)
+                        ]
 
         if wf.num_executions and wf.num_executions >= 1:
             has_execution = True
