@@ -567,6 +567,7 @@ export function ExtractionEditorPanel() {
             extractionConfig={config}
             onUpdateItem={update}
             onValidationComplete={refresh}
+            onSaveConfig={saveConfig}
           />
         </div>
       )}
@@ -2015,6 +2016,7 @@ function ValidateTab({
   extractionConfig,
   onUpdateItem,
   onValidationComplete,
+  onSaveConfig,
 }: {
   searchSetUuid: string
   itemTitle?: string
@@ -2022,7 +2024,9 @@ function ValidateTab({
   extractionConfig: ExtractionConfig
   onUpdateItem: (id: string, data: { is_optional?: boolean; enum_values?: string[] }) => void
   onValidationComplete?: () => void
+  onSaveConfig?: (config: ExtractionConfig) => Promise<void>
 }) {
+  const { toast } = useToast()
   const { selectedDocUuids, viewDocument } = useWorkspace()
   const [sources, setSources] = useState<SourceLocal[]>([])
   const [loadingSources, setLoadingSources] = useState(true)
@@ -2774,11 +2778,11 @@ function ValidateTab({
                 onClick={async () => {
                   const best = tuningResults[0]
                   if (!best?.config_override) return
-                  await saveConfig(best.config_override as ExtractionConfig)
+                  await onSaveConfig?.(best.config_override as ExtractionConfig)
                   setTuningResults(null)
                   setTuningRecommendation(null)
                   clearTuningResult(searchSetUuid).catch(() => {})
-                  toast({ title: `Switched to ${best.label}`, variant: 'success' })
+                  toast(`Switched to ${best.label}`, 'success')
                 }}
                 style={{
                   marginTop: 10, display: 'inline-flex', alignItems: 'center', gap: 6,
