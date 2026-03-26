@@ -132,6 +132,7 @@ export function KnowledgePanel() {
 
   const loadDetail = useCallback(async (uuid: string) => {
     setDetailLoading(true)
+    setVerificationSubmitted(false)
     try {
       const detail = await api.getKnowledgeBase(uuid)
       setSelectedKB(detail)
@@ -249,6 +250,7 @@ export function KnowledgePanel() {
   const [verifyDescription, setVerifyDescription] = useState('')
   const [verifyCategory, setVerifyCategory] = useState('')
   const [submittingVerify, setSubmittingVerify] = useState(false)
+  const [verificationSubmitted, setVerificationSubmitted] = useState(false)
 
   const handleSubmitVerification = async () => {
     if (!selectedKB) return
@@ -263,6 +265,8 @@ export function KnowledgePanel() {
       setVerifySummary('')
       setVerifyDescription('')
       setVerifyCategory('')
+      setVerificationSubmitted(true)
+      toast('Submitted for verification', 'success')
       loadDetail(selectedKB.uuid)
     } catch (err) {
       console.error('Failed to submit for verification:', err)
@@ -477,18 +481,29 @@ export function KnowledgePanel() {
                 {selectedKB.shared_with_team ? 'Shared with Team' : 'Share with Team'}
               </button>
               {selectedKB.status === 'ready' && !selectedKB.verified && (
-                <button
-                  onClick={() => setShowVerifyModal(true)}
-                  style={{
+                verificationSubmitted ? (
+                  <span style={{
                     display: 'flex', alignItems: 'center', gap: 6,
-                    padding: '6px 12px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
-                    color: '#e5e5e5', backgroundColor: '#2a2a2a',
-                    border: '1px solid #3a3a3a', borderRadius: 6, cursor: 'pointer',
-                  }}
-                >
-                  <Send size={13} />
-                  Submit for Verification
-                </button>
+                    padding: '6px 12px', fontSize: 12, fontWeight: 600,
+                    color: '#059669',
+                  }}>
+                    <ShieldCheck size={13} />
+                    Submitted for Verification
+                  </span>
+                ) : (
+                  <button
+                    onClick={() => setShowVerifyModal(true)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 6,
+                      padding: '6px 12px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
+                      color: '#e5e5e5', backgroundColor: '#2a2a2a',
+                      border: '1px solid #3a3a3a', borderRadius: 6, cursor: 'pointer',
+                    }}
+                  >
+                    <Send size={13} />
+                    Submit for Verification
+                  </button>
+                )
               )}
               {selectedKB.verified && isExaminerOrAdmin && (
                 <button

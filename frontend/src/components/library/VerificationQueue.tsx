@@ -260,7 +260,7 @@ export function VerificationQueue() {
                         )}
                       </div>
                       <div className="text-xs text-gray-500 space-x-3 ml-9">
-                        <span>{req.item_kind === 'workflow' ? 'Workflow' : 'Extraction'}</span>
+                        <span>{req.item_kind === 'workflow' ? 'Workflow' : req.item_kind === 'knowledge_base' ? 'Knowledge Base' : 'Extraction'}</span>
                         {req.submitter_name && <span>by {req.submitter_name}</span>}
                         {req.submitter_org && <span>({req.submitter_org})</span>}
                         {req.submitted_at && (
