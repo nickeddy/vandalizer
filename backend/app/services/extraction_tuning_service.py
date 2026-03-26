@@ -4,7 +4,10 @@ import asyncio
 import logging
 import time
 
+import datetime
+
 from app.models.extraction_test_case import ExtractionTestCase
+from app.models.search_set import SearchSet
 from app.models.system_config import SystemConfig
 from app.services.extraction_engine import ExtractionEngine
 from app.services.extraction_validation_service import (
@@ -324,6 +327,17 @@ async def find_best_settings_stream(
         )
     else:
         recommendation = "No configurations could be evaluated. Check model availability."
+
+    # Persist results on the SearchSet so they survive navigation/reload
+    ss = await SearchSet.find_one(SearchSet.uuid == search_set_uuid)
+    if ss:
+        ss.tuning_result = {
+            "best": best,
+            "results": results,
+            "recommendation": recommendation,
+            "ran_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        }
+        await ss.save()
 
     yield {
         "kind": "done",

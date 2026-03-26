@@ -965,6 +965,22 @@ async def find_best_settings(
     return StreamingResponse(generate(), media_type="text/event-stream")
 
 
+@router.get("/search-sets/{uuid}/tuning-result")
+async def get_tuning_result(uuid: str, user: User = Depends(get_current_user)):
+    """Return the persisted tuning result for a search set, or null."""
+    ss = await _get_search_set_or_404(uuid, user)
+    return {"tuning_result": ss.tuning_result}
+
+
+@router.delete("/search-sets/{uuid}/tuning-result")
+async def clear_tuning_result(uuid: str, user: User = Depends(get_current_user)):
+    """Clear the persisted tuning result."""
+    ss = await _get_search_set_or_404(uuid, user, manage=True)
+    ss.tuning_result = None
+    await ss.save()
+    return {"ok": True}
+
+
 @router.post("/validate")
 @limiter.limit("10/minute")
 async def run_validation(request: Request, req: RunValidationRequest, user: User = Depends(get_current_user)):

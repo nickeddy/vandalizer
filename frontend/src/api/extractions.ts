@@ -393,6 +393,21 @@ export type TuningStreamEvent =
   | { kind: 'done'; best: TuningResult; results: TuningResult[]; recommendation: string }
   | { kind: 'error'; detail: string }
 
+// Tuning result persistence
+
+export function getTuningResult(uuid: string) {
+  return apiFetch<{ tuning_result: FindBestSettingsResult & { ran_at: string } | null }>(
+    `/api/extractions/search-sets/${uuid}/tuning-result`
+  )
+}
+
+export function clearTuningResult(uuid: string) {
+  return apiFetch<{ ok: boolean }>(
+    `/api/extractions/search-sets/${uuid}/tuning-result`,
+    { method: 'DELETE' }
+  )
+}
+
 // Export / Import
 
 export function exportSearchSetUrl(uuid: string) {

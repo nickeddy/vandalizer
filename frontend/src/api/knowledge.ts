@@ -97,7 +97,7 @@ export function submitKBForVerification(kbUuid: string, data: {
   description?: string
   category?: string
 }) {
-  return apiFetch<Record<string, unknown>>('/api/verify/submit', {
+  return apiFetch<Record<string, unknown>>('/api/verification/submit', {
     method: 'POST',
     body: JSON.stringify({
       item_kind: 'knowledge_base',

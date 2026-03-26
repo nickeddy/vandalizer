@@ -44,6 +44,7 @@ class SearchSet(Document):
     item_order: list[str] = []
     domain: Optional[str] = None  # nsf | nih | dod | doe — for domain-specific prompts
     cross_field_rules: list[dict] = []  # cross-field validation rules
+    tuning_result: Optional[dict] = None  # persisted "Find Best Settings" result
 
     class Settings:
         name = "search_set"

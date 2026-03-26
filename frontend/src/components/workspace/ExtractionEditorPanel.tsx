@@ -23,6 +23,8 @@ import {
   generateExampleTemplate,
   exportSearchSetUrl,
   importSearchSet,
+  getTuningResult,
+  clearTuningResult,
 } from '../../api/extractions'
 import type { ValidationV2Result, QualityHistoryRun, ValidationSource, TuningResult, TuningStreamEvent } from '../../api/extractions'
 import { findBestSettingsStream } from '../../api/extractions'
@@ -2078,6 +2080,18 @@ function ValidateTab({
       .catch(() => {})
   }, [searchSetUuid])
 
+  // Load persisted tuning results
+  useEffect(() => {
+    getTuningResult(searchSetUuid)
+      .then(r => {
+        if (r.tuning_result) {
+          setTuningResults(r.tuning_result.results)
+          setTuningRecommendation(r.tuning_result.recommendation)
+        }
+      })
+      .catch(() => {})
+  }, [searchSetUuid])
+
   // Cleanup debounce timers on unmount
   useEffect(() => {
     const timers = debounceTimers.current
@@ -2674,7 +2688,10 @@ function ValidateTab({
               <span style={{ fontSize: 13, fontWeight: 600, color: '#5b21b6' }}>Settings Comparison</span>
               {!tuning && (
                 <button
-                  onClick={() => { setTuningResults(null); setTuningRecommendation(null); setTuningProgress(null) }}
+                  onClick={() => {
+                    setTuningResults(null); setTuningRecommendation(null); setTuningProgress(null)
+                    clearTuningResult(searchSetUuid).catch(() => {})
+                  }}
                   style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', padding: 2 }}
                 >
                   <X style={{ width: 12, height: 12 }} />
@@ -2751,6 +2768,27 @@ function ValidateTab({
               <div style={{ fontSize: 12, color: '#5b21b6', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
                 {tuningRecommendation}
               </div>
+            )}
+            {!tuning && tuningResults && tuningResults.length > 0 && !tuningResults[0].error && (
+              <button
+                onClick={async () => {
+                  const best = tuningResults[0]
+                  if (!best?.config_override) return
+                  await saveConfig(best.config_override as ExtractionConfig)
+                  setTuningResults(null)
+                  setTuningRecommendation(null)
+                  clearTuningResult(searchSetUuid).catch(() => {})
+                  toast({ title: `Switched to ${best.label}`, variant: 'success' })
+                }}
+                style={{
+                  marginTop: 10, display: 'inline-flex', alignItems: 'center', gap: 6,
+                  padding: '7px 16px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
+                  borderRadius: 8, border: 'none', backgroundColor: '#7c3aed', color: '#fff',
+                  cursor: 'pointer',
+                }}
+              >
+                <Sparkles style={{ width: 13, height: 13 }} /> Apply Best Settings
+              </button>
             )}
           </div>
         )}
