@@ -292,7 +292,7 @@ do_login() {
   if curl -s -w "\n%{http_code}" \
        -X POST "${BASE_URL}/api/auth/login" \
        -H "Content-Type: application/json" \
-       -d "{\"email\":\"${email}\",\"password\":\"${password}\"}" \
+       -d "{\"user_id\":\"${email}\",\"password\":\"${password}\"}" \
        -c "$cookies_file" \
        > "${TMP_DIR}/response" 2>/dev/null; then
 
@@ -804,7 +804,7 @@ startup_login() {
   curl -s -w "\n%{http_code}" \
     -X POST "${BASE_URL}/api/auth/login" \
     -H "Content-Type: application/json" \
-    -d "{\"email\":\"${email}\",\"password\":\"${password}\"}" \
+    -d "{\"user_id\":\"${email}\",\"password\":\"${password}\"}" \
     -c "$cookies_file" \
     > "${TMP_DIR}/response" 2>/dev/null &
   local pid=$!
