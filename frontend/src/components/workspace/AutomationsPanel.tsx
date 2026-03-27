@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { Plus, Loader2 } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { FolderSearch, Globe, Loader2, Plus, Search, X } from 'lucide-react'
 import { AutomationsTutorial } from './AutomationsTutorial'
 import { AutomationCreationWizard } from './AutomationCreationWizard'
 import { useAutomations } from '../../hooks/useAutomations'
@@ -14,11 +14,17 @@ const TRIGGER_BADGES: Record<TriggerType, { label: string; color: string; bg: st
   m365_intake: { label: 'M365', color: '#15803d', bg: '#dcfce7' },
 }
 
+type FilterMode = 'all' | 'folder_watch' | 'api'
+
 export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?: Set<string> }) {
   const { openAutomation, openAutomationId } = useWorkspace()
   const { automations, loading, refresh } = useAutomations()
   const { workflows } = useWorkflows()
   const { searchSets } = useSearchSets()
+
+  const [filter, setFilter] = useState<FilterMode>('all')
+  const [search, setSearch] = useState('')
+  const [showWizard, setShowWizard] = useState(false)
 
   // Refresh list when editor saves or closes
   useEffect(() => {
@@ -27,7 +33,25 @@ export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?
     window.addEventListener('automations-updated', handler)
     return () => window.removeEventListener('automations-updated', handler)
   }, [openAutomationId])
-  const [showWizard, setShowWizard] = useState(false)
+
+  const filtered = useMemo(() => {
+    let list = automations
+    if (filter !== 'all') list = list.filter(a => a.trigger_type === filter)
+    if (search.trim()) {
+      const q = search.toLowerCase()
+      list = list.filter(a =>
+        a.name.toLowerCase().includes(q) ||
+        (a.description || '').toLowerCase().includes(q),
+      )
+    }
+    return list
+  }, [automations, filter, search])
+
+  const counts = useMemo(() => ({
+    all: automations.length,
+    folder_watch: automations.filter(a => a.trigger_type === 'folder_watch').length,
+    api: automations.filter(a => a.trigger_type === 'api').length,
+  }), [automations])
 
   const getActionName = (auto: Automation): string => {
     if (auto.action_type === 'workflow' && auto.action_id) {
@@ -87,6 +111,48 @@ export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?
         </button>
       </div>
 
+      {/* Filter bar */}
+      {automations.length > 0 && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 6,
+          padding: '8px 12px',
+          backgroundColor: '#1e1e1e',
+          borderBottom: '1px solid #2f2f2f',
+          flexShrink: 0,
+        }}>
+          <FilterPill label="All" count={counts.all} active={filter === 'all'} onClick={() => setFilter('all')} />
+          <FilterPill label="Folder Watch" count={counts.folder_watch} active={filter === 'folder_watch'} onClick={() => setFilter('folder_watch')} icon={<FolderSearch size={10} />} />
+          <FilterPill label="API" count={counts.api} active={filter === 'api'} onClick={() => setFilter('api')} icon={<Globe size={10} />} />
+          <div style={{ flex: 1 }} />
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 4,
+            padding: '0 8px', height: 26,
+            backgroundColor: '#191919', border: '1px solid #3a3a3a', borderRadius: 5,
+            maxWidth: 160,
+          }}>
+            <Search size={11} style={{ color: '#555', flexShrink: 0 }} />
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Filter..."
+              style={{
+                flex: 1, width: 60, padding: 0, fontSize: 11, fontFamily: 'inherit',
+                color: '#ccc', backgroundColor: 'transparent',
+                border: 'none', outline: 'none',
+              }}
+            />
+            {search && (
+              <button
+                onClick={() => setSearch('')}
+                style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 0, display: 'flex' }}
+              >
+                <X size={10} style={{ color: '#555' }} />
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* List */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '12px 12px' }}>
         {loading ? (
@@ -95,9 +161,13 @@ export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?
           </div>
         ) : automations.length === 0 ? (
           <AutomationsTutorial />
+        ) : filtered.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: 40, color: '#666', fontSize: 13 }}>
+            No matching automations
+          </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {automations.map(auto => {
+            {filtered.map(auto => {
               const badge = TRIGGER_BADGES[auto.trigger_type] || TRIGGER_BADGES.folder_watch
               const isRunning = activeIds.has(auto.id)
               return (
@@ -189,5 +259,39 @@ export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?
         />
       )}
     </div>
+  )
+}
+
+function FilterPill({ label, count, active, onClick, icon }: {
+  label: string
+  count: number
+  active: boolean
+  onClick: () => void
+  icon?: React.ReactNode
+}) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 4,
+        padding: '3px 10px', fontSize: 11, fontWeight: 600,
+        fontFamily: 'inherit', borderRadius: 12,
+        color: active ? '#fff' : '#888',
+        backgroundColor: active ? '#3a3a3a' : 'transparent',
+        border: active ? '1px solid #555' : '1px solid transparent',
+        cursor: 'pointer', transition: 'all 0.12s',
+        whiteSpace: 'nowrap',
+      }}
+    >
+      {icon}
+      {label}
+      <span style={{
+        fontSize: 10, fontWeight: 600,
+        color: active ? '#ccc' : '#555',
+        marginLeft: 1,
+      }}>
+        {count}
+      </span>
+    </button>
   )
 }

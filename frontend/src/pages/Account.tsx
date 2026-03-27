@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { User, KeyRound, Save, Eye, EyeOff, Copy, Check, RefreshCw, Trash2, Globe, Code } from 'lucide-react'
+import { User, KeyRound, Save, Eye, EyeOff, Copy, Check, RefreshCw, Trash2, Code } from 'lucide-react'
 import { PageLayout } from '../components/layout/PageLayout'
 import { useAuth } from '../hooks/useAuth'
 import { generateApiToken, revokeApiToken, getApiTokenStatus, updateProfile } from '../api/auth'
@@ -44,37 +44,42 @@ export default function Account() {
   const [tokenLoading, setTokenLoading] = useState(true)
   const [tokenGenerating, setTokenGenerating] = useState(false)
   const [tokenRevoking, setTokenRevoking] = useState(false)
+  const [tokenError, setTokenError] = useState<string | null>(null)
 
   useEffect(() => {
     getApiTokenStatus()
       .then(s => { setHasToken(s.has_token); setTokenCreatedAt(s.created_at) })
-      .catch(() => {})
+      .catch(err => { setTokenError(err instanceof Error ? err.message : 'Failed to load token status') })
       .finally(() => setTokenLoading(false))
   }, [])
 
   const handleGenerateToken = async () => {
-    if (hasToken && !confirm('This will replace your existing token. The Chrome extension will need to be reconfigured. Continue?')) return
+    if (hasToken && !confirm('This will replace your existing token. Continue?')) return
     setTokenGenerating(true)
+    setTokenError(null)
     try {
       const res = await generateApiToken()
       setNewToken(res.api_token)
       setHasToken(true)
       setTokenCreatedAt(res.created_at)
       setTokenVisible(true)
-    } catch { /* ignore */ }
-    finally { setTokenGenerating(false) }
+    } catch (err) {
+      setTokenError(err instanceof Error ? err.message : 'Failed to generate token')
+    } finally { setTokenGenerating(false) }
   }
 
   const handleRevokeToken = async () => {
-    if (!confirm('Are you sure you want to revoke this token? The Chrome extension will stop working.')) return
+    if (!confirm('Are you sure you want to revoke this token?')) return
     setTokenRevoking(true)
+    setTokenError(null)
     try {
       await revokeApiToken()
       setHasToken(false)
       setTokenCreatedAt(null)
       setNewToken(null)
-    } catch { /* ignore */ }
-    finally { setTokenRevoking(false) }
+    } catch (err) {
+      setTokenError(err instanceof Error ? err.message : 'Failed to revoke token')
+    } finally { setTokenRevoking(false) }
   }
 
   const handleCopyToken = () => {
@@ -209,9 +214,15 @@ curl -X POST "$BASE_URL/api/workflows/run-integrated" \\
           </div>
           <div className="p-4 space-y-4">
             <p className="text-sm text-gray-600">
-              Use an API token to access Vandalizer from the Chrome Extension or external integrations.
+              Use an API token to access Vandalizer from external integrations.
               Keep it secure — it provides full access to your account.
             </p>
+
+            {tokenError && (
+              <div className="rounded-md border border-red-200 bg-red-50 p-3">
+                <p className="text-sm text-red-700">{tokenError}</p>
+              </div>
+            )}
 
             {tokenLoading ? (
               <p className="text-sm text-gray-400">Loading token status...</p>
@@ -284,7 +295,7 @@ curl -X POST "$BASE_URL/api/workflows/run-integrated" \\
               <>
                 <div className="rounded-md border border-blue-100 bg-blue-50 p-3">
                   <p className="text-sm text-blue-700">
-                    You haven't generated an API token yet. Generate one to use with the Chrome Extension or external integrations.
+                    You haven't generated an API token yet. Generate one to use with external integrations.
                   </p>
                 </div>
                 <button
@@ -298,38 +309,6 @@ curl -X POST "$BASE_URL/api/workflows/run-integrated" \\
               </>
             )}
 
-            {/* Chrome Extension Setup */}
-            {hasToken && (
-              <div className="border-t border-gray-100 pt-4 mt-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <Globe className="h-4 w-4 text-gray-400" />
-                  <h4 className="text-sm font-medium text-gray-700">Chrome Extension Setup</h4>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-medium uppercase text-gray-400 mb-1">Backend URL</label>
-                    <input
-                      type="text"
-                      readOnly
-                      value={window.location.origin}
-                      className="w-full rounded-md border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs font-mono text-gray-600"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium uppercase text-gray-400 mb-1">User Token</label>
-                    <input
-                      type="text"
-                      readOnly
-                      value={newToken ? '(see above)' : '(token hidden)'}
-                      className="w-full rounded-md border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs font-mono text-gray-600"
-                    />
-                  </div>
-                </div>
-                <p className="text-xs text-gray-400 mt-2">
-                  Enter these values in the Chrome Extension popup to connect.
-                </p>
-              </div>
-            )}
           </div>
         </div>
 

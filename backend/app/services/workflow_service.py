@@ -182,16 +182,8 @@ async def duplicate_workflow(workflow_id: str, user: User, user_id: str, team_id
     if not original:
         return None
 
-    new_wf = Workflow(
-        name=f"{original['name']} (Copy)",
-        description=original.get("description"),
-        user_id=user_id,
-        team_id=team_id,
-        created_by_user_id=user_id,
-    )
-    await new_wf.insert()
-
-    # Clone steps and tasks
+    # Clone steps and tasks first so the workflow can be inserted in a
+    # single write with all step references already populated.
     new_step_ids = []
     for step_data in original.get("steps", []):
         new_task_ids = []
@@ -209,17 +201,25 @@ async def duplicate_workflow(workflow_id: str, user: User, user_id: str, team_id
         await new_step.insert()
         new_step_ids.append(new_step.id)
 
-    new_wf.steps = new_step_ids
-
     # Copy validation plan and inputs from original
     original_wf = await Workflow.get(PydanticObjectId(workflow_id))
+    validation_plan = []
+    validation_inputs = []
     if original_wf:
-        if original_wf.validation_plan:
-            new_wf.validation_plan = original_wf.validation_plan
-        if original_wf.validation_inputs:
-            new_wf.validation_inputs = original_wf.validation_inputs
+        validation_plan = original_wf.validation_plan or []
+        validation_inputs = original_wf.validation_inputs or []
 
-    await new_wf.save()
+    new_wf = Workflow(
+        name=f"{original['name']} (Copy)",
+        description=original.get("description"),
+        user_id=user_id,
+        team_id=team_id,
+        created_by_user_id=user_id,
+        steps=new_step_ids,
+        validation_plan=validation_plan,
+        validation_inputs=validation_inputs,
+    )
+    await new_wf.insert()
 
     return await get_workflow(str(new_wf.id))
 
@@ -833,47 +833,179 @@ async def generate_validation_plan(workflow_id: str, user: User) -> list[dict]:
     if not wf_data:
         raise ValueError("Workflow not found")
 
-    # Build a detailed summary of the workflow for the LLM
-    steps_summary = []
-    for step in wf_data.get("steps", []):
-        tasks_desc = []
+    # Build a data-flow-aware analysis of the workflow for the LLM.
+    # For each step, describe what it does, what data it produces, and what
+    # the next step receives — so the LLM can reason about what must appear
+    # in the final output.
+    steps = wf_data.get("steps", [])
+    all_extracted_fields: list[dict] = []  # accumulate across all extraction steps
+    step_analyses = []
+    for idx, step in enumerate(steps):
+        is_output = step.get("is_output", False)
+        is_last = idx == len(steps) - 1
+        step_desc_parts = [f"### Step {idx + 1}: {step['name']}"]
+        if is_output or is_last:
+            step_desc_parts[0] += "  [FINAL OUTPUT STEP]"
+
         for task in step.get("tasks", []):
-            task_info = f"  - Task: {task['name']}"
             data = task.get("data", {})
-            if task["name"] == "Prompt" and data.get("prompt"):
-                task_info += f" (prompt: {data['prompt'][:200]})"
-            elif task["name"] == "Extraction" and data.get("extractions"):
-                field_names = [e.get("key", "") for e in data["extractions"][:10]]
-                task_info += f" (fields: {', '.join(field_names)})"
-            elif task["name"] == "DataExport":
+            task_name = task["name"]
+
+            if task_name == "Extraction":
+                extractions = data.get("extractions", [])
+                fields_detail = []
+                for ext in extractions[:30]:
+                    key = ext.get("key", "")
+                    desc = ext.get("description", "")
+                    is_optional = ext.get("is_optional", False)
+                    enum_vals = ext.get("enum_values", [])
+                    field_info = {"key": key, "description": desc}
+                    if is_optional:
+                        field_info["optional"] = True
+                    if enum_vals:
+                        field_info["allowed_values"] = enum_vals
+                    fields_detail.append(field_info)
+                    all_extracted_fields.append(field_info)
+
+                step_desc_parts.append(
+                    f"**Extraction task** — extracts the following fields from the input:\n"
+                    + "\n".join(
+                        f"  - `{f['key']}`"
+                        + (f": {f['description']}" if f.get('description') else "")
+                        + (" (optional)" if f.get('optional') else "")
+                        + (f" [allowed: {', '.join(f['allowed_values'])}]" if f.get('allowed_values') else "")
+                        for f in fields_detail
+                    )
+                )
+                step_desc_parts.append(
+                    f"This step PRODUCES a structured object with these {len(fields_detail)} fields."
+                )
+
+            elif task_name == "Prompt":
+                prompt_text = data.get("prompt", "")
+                # Include the full prompt (up to 2000 chars) so the LLM can understand
+                # what transformation is being applied
+                truncated = prompt_text[:2000]
+                if len(prompt_text) > 2000:
+                    truncated += "..."
+                step_desc_parts.append(
+                    f"**Prompt task** — sends the previous step's output to an LLM with this instruction:\n"
+                    f'"{truncated}"'
+                )
+                step_desc_parts.append(
+                    "This step PRODUCES free-form text shaped by the prompt instruction."
+                )
+
+            elif task_name == "Formatter":
+                format_template = data.get("format_template") or data.get("prompt", "")
+                truncated = format_template[:2000]
+                if len(format_template) > 2000:
+                    truncated += "..."
+                step_desc_parts.append(
+                    f"**Formatter task** — reformats the previous step's output using this template/instruction:\n"
+                    f'"{truncated}"'
+                )
+                step_desc_parts.append(
+                    "This step PRODUCES reformatted text according to the template."
+                )
+
+            elif task_name == "DataExport":
                 fmt = data.get("format", "json")
-                task_info += f" (format: {fmt})"
-            elif task["name"] == "DocumentRenderer":
+                step_desc_parts.append(
+                    f"**Data Export task** — exports the data in `{fmt}` format."
+                )
+                step_desc_parts.append(
+                    f"This step PRODUCES a {fmt.upper()} file/text as output."
+                )
+
+            elif task_name == "DocumentRenderer":
                 tpl = data.get("template_type", "")
-                task_info += f" (template: {tpl})"
-            tasks_desc.append(task_info)
-        step_desc = f"Step: {step['name']}" + (" [OUTPUT]" if step.get("is_output") else "")
-        steps_summary.append(step_desc + "\n" + "\n".join(tasks_desc))
+                step_desc_parts.append(
+                    f"**Document Renderer task** — renders output using template: `{tpl}`."
+                )
+
+            elif task_name == "AddWebsite":
+                url = data.get("url", "")
+                step_desc_parts.append(
+                    f"**Website task** — fetches content from `{url}` and passes text to next step."
+                )
+
+            elif task_name == "AddDocument":
+                step_desc_parts.append(
+                    "**Add Document task** — loads document text into the pipeline."
+                )
+
+            elif task_name == "CodeExecution":
+                code = data.get("code", "")[:500]
+                step_desc_parts.append(
+                    f"**Code Execution task** — runs custom code on the data."
+                )
+
+            else:
+                step_desc_parts.append(f"**{task_name} task**")
+
+        if idx < len(steps) - 1:
+            next_step = steps[idx + 1]
+            step_desc_parts.append(
+                f"\n→ Output flows to Step {idx + 2}: {next_step['name']}"
+            )
+
+        step_analyses.append("\n".join(step_desc_parts))
+
+    # Build the data flow summary
+    data_flow_section = ""
+    if all_extracted_fields:
+        field_names = [f['key'] for f in all_extracted_fields]
+        data_flow_section = (
+            "\n\n## Data That Must Survive to Final Output\n"
+            f"The workflow extracts these specific data points: {', '.join(f'`{n}`' for n in field_names)}.\n"
+            "Each of these extracted values should be present (or clearly represented) "
+            "in the final output unless a downstream step explicitly filters them out."
+        )
 
     workflow_desc = (
-        f"Workflow: {wf_data.get('name', 'Unnamed')}\n"
-        f"Description: {wf_data.get('description', 'No description')}\n\n"
-        + "\n\n".join(steps_summary)
+        f"## Workflow: {wf_data.get('name', 'Unnamed')}\n"
+        f"**Description**: {wf_data.get('description', 'No description')}\n"
+        f"**Number of steps**: {len(steps)}\n\n"
+        "## Step-by-Step Data Flow\n\n"
+        + "\n\n".join(step_analyses)
+        + data_flow_section
     )
 
     system_prompt = (
-        "You are a workflow quality analyst. Given a workflow definition, generate 4-8 quality "
-        "check DEFINITIONS that can later be evaluated against the workflow's actual output.\n\n"
-        "Focus on these categories:\n"
-        "- completeness: Are all expected fields/sections present?\n"
-        "- formatting: Is the output in the correct format (JSON, CSV, markdown, etc.)?\n"
-        "- content: Is the content meaningful, coherent, and relevant?\n"
-        "- accuracy: Are there signals of correctness (consistent data, reasonable values)?\n\n"
+        "You are a workflow output quality analyst. Your job is to generate validation "
+        "checks that will be evaluated against the ACTUAL OUTPUT of a workflow — not the "
+        "workflow definition itself.\n\n"
+        "You will be given a detailed data flow analysis of a workflow: what each step "
+        "extracts or transforms, how data flows between steps, and what the final output "
+        "should contain.\n\n"
+        "Generate 4-8 quality check DEFINITIONS. Each check must be something that can be "
+        "verified by reading the workflow's output text.\n\n"
+        "IMPORTANT — focus on these aspects:\n"
+        "- **completeness**: Does the output contain ALL the specific data points that were "
+        "extracted or computed upstream? Name the specific fields/values that must be present. "
+        "For example, if the workflow extracts 4 fields, check that all 4 appear in the output.\n"
+        "- **accuracy**: Does the extracted data appear to be faithfully carried through? "
+        "Are values reasonable and consistent with what was asked for? Are any values "
+        "hallucinated or contradictory?\n"
+        "- **content**: Does the output fulfill the purpose described in the prompt/formatting "
+        "instructions? If the workflow says 'format into human readable language', is it "
+        "actually readable and well-written?\n"
+        "- **formatting**: Does the output match the requested format (e.g., if the prompt "
+        "asks for a paragraph, is it a paragraph and not a JSON blob)?\n\n"
+        "DO NOT generate checks about:\n"
+        "- The workflow definition's structure (YAML syntax, step headers, indentation)\n"
+        "- Whether the workflow has a name or description\n"
+        "- Step naming conventions or task formatting\n"
+        "These checks are about the WORKFLOW OUTPUT, not the workflow definition.\n\n"
+        "Make each check description SPECIFIC to this workflow. Reference the actual field "
+        "names, prompt instructions, and expected data. A good check is one where a human "
+        "reading just the check description would know exactly what to look for in the output.\n\n"
         "Return ONLY a JSON array of check definition objects. Each object must have:\n"
         '- "name": short check name (string, max 60 chars)\n'
-        '- "description": what the evaluator should look for in the output (string)\n'
+        '- "description": detailed description of what the evaluator should look for in the '
+        "output — be specific, name the fields and values (string)\n"
         '- "category": one of "completeness", "formatting", "content", "accuracy" (string)\n\n'
-        "Do NOT evaluate anything — just define what should be checked.\n"
         "Return ONLY the JSON array, no other text."
     )
 
@@ -1045,22 +1177,42 @@ async def _evaluate_checks_against_output(
         indent=2,
     )
 
-    # Include a summary of steps_output (truncated)
+    # Include intermediate step outputs so the evaluator can cross-reference
+    # whether data was faithfully carried through the pipeline
     steps_text = ""
     if steps_output:
-        steps_text = "\n\n## Intermediate Step Outputs\n" + _json.dumps(steps_output, indent=2, default=str)[:20_000]
+        steps_text = (
+            "\n\n## Intermediate Step Outputs (for cross-referencing)\n"
+            "Use these to verify that data extracted in earlier steps actually "
+            "appears in the final output.\n"
+            + _json.dumps(steps_output, indent=2, default=str)[:20_000]
+        )
 
     system_prompt = (
-        "You are a strict quality evaluator. You are given the actual output of a workflow execution "
-        "and a list of quality checks to evaluate.\n\n"
-        "For EACH check, determine whether it PASSES, FAILS, or deserves a WARNING based on the output.\n"
-        "Cite specific evidence from the output to justify your assessment.\n\n"
+        "You are a strict quality evaluator for workflow outputs. You will be given:\n"
+        "1. A list of quality checks to evaluate\n"
+        "2. The final output of a workflow execution\n"
+        "3. Intermediate step outputs (to cross-reference data flow)\n\n"
+        "Your job is to determine whether the FINAL OUTPUT satisfies each check.\n\n"
+        "Key evaluation principles:\n"
+        "- For COMPLETENESS checks: verify that specific named data points actually appear "
+        "in the output. Cross-reference with intermediate step outputs to confirm data "
+        "was carried through. If an extraction step produced a value but it's missing from "
+        "the final output, that's a FAIL.\n"
+        "- For ACCURACY checks: compare values in the final output against intermediate "
+        "step data. If the final output restates or reformats extracted data, verify it "
+        "matches. Flag any values that appear fabricated or inconsistent.\n"
+        "- For CONTENT checks: assess whether the output fulfills its stated purpose "
+        "(e.g., 'human readable summary' should be a coherent narrative, not raw data).\n"
+        "- For FORMATTING checks: verify the output matches the requested format.\n\n"
+        "For EACH check, determine: PASS, FAIL, or WARN.\n"
+        "Cite specific evidence from the output (quote actual text/values) to justify "
+        "your assessment.\n\n"
         "Return ONLY a JSON array of result objects. Each object must have:\n"
         '- "check_id": the check ID from the input (string)\n'
         '- "status": one of "PASS", "FAIL", "WARN" (string)\n'
-        '- "detail": specific evidence from the output justifying the status (string)\n\n'
-        "Be thorough but fair. Use PASS when the check is clearly satisfied, "
-        "FAIL when clearly not satisfied, WARN when partially satisfied or ambiguous.\n"
+        '- "detail": specific evidence from the output justifying the status — quote '
+        "actual values and text (string)\n\n"
         "Return ONLY the JSON array, no other text."
     )
 

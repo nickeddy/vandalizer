@@ -113,20 +113,8 @@ async def import_workflow(
 
     item = data["items"][0]
 
-    new_wf = Workflow(
-        name=f"{item['name']} (Imported)",
-        description=item.get("description"),
-        user_id=user_id,
-        team_id=team_id,
-        created_by_user_id=user_id,
-        input_config=item.get("input_config", {}),
-        output_config=item.get("output_config", {}),
-        resource_config=item.get("resource_config", {}),
-        validation_plan=item.get("validation_plan", []),
-        validation_inputs=item.get("validation_inputs", []),
-    )
-    await new_wf.insert()
-
+    # Create steps and tasks first so the workflow can be inserted in a
+    # single write with all step references already populated.
     new_step_ids = []
     for step_data in item.get("steps", []):
         new_task_ids = []
@@ -147,8 +135,20 @@ async def import_workflow(
         await new_step.insert()
         new_step_ids.append(new_step.id)
 
-    new_wf.steps = new_step_ids
-    await new_wf.save()
+    new_wf = Workflow(
+        name=f"{item['name']} (Imported)",
+        description=item.get("description"),
+        user_id=user_id,
+        team_id=team_id,
+        created_by_user_id=user_id,
+        steps=new_step_ids,
+        input_config=item.get("input_config", {}),
+        output_config=item.get("output_config", {}),
+        resource_config=item.get("resource_config", {}),
+        validation_plan=item.get("validation_plan", []),
+        validation_inputs=item.get("validation_inputs", []),
+    )
+    await new_wf.insert()
 
     return await workflow_service.get_workflow(str(new_wf.id))
 
