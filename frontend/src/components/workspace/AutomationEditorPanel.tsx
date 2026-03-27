@@ -316,11 +316,11 @@ export function AutomationEditorPanel() {
         {(automation.action_type === 'workflow' || automation.action_type === 'extraction' || automation.action_type === 'task') && (() => {
           const actionKind = automation.action_type === 'extraction' ? 'extraction' : 'workflow'
           const kindLabel = automation.action_type === 'extraction' ? 'Extraction' : automation.action_type === 'task' ? 'Workflow Task' : 'Workflow'
-          // Resolve current action name from loaded data
-          let currentName = ''
-          if (automation.action_id) {
+          // Resolve current action name from API response, falling back to local lookup
+          let currentName = automation.action_name || ''
+          if (!currentName && automation.action_id) {
             if (automation.action_type === 'extraction') {
-              const ss = searchSets.find(s => s.uuid === automation.action_id)
+              const ss = searchSets.find(s => s.uuid === automation.action_id || s.id === automation.action_id)
               currentName = ss?.title || ''
             } else {
               const wf = workflows.find(w => w.id === automation.action_id)

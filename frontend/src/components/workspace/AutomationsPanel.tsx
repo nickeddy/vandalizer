@@ -55,16 +55,16 @@ export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?
 
   const getActionName = (auto: Automation): string => {
     if (auto.action_type === 'workflow' && auto.action_id) {
-      const wf = workflows.find(w => w.id === auto.action_id)
-      return wf ? `Runs: ${wf.name}` : 'Runs: (unknown workflow)'
+      const name = auto.action_name || workflows.find(w => w.id === auto.action_id)?.name
+      return name ? `Runs: ${name}` : 'Runs: (unknown workflow)'
     }
     if (auto.action_type === 'extraction' && auto.action_id) {
-      const ss = searchSets.find(s => s.uuid === auto.action_id || s.id === auto.action_id)
-      return ss ? `Extracts: ${ss.title}` : 'Extracts: (unknown extraction)'
+      const name = auto.action_name || searchSets.find(s => s.uuid === auto.action_id || s.id === auto.action_id)?.title
+      return name ? `Extracts: ${name}` : 'Extracts: (unknown extraction)'
     }
     if (auto.action_type === 'task' && auto.action_id) {
-      const wf = workflows.find(w => w.id === auto.action_id)
-      return wf ? `Task: ${wf.name}` : 'Task: (unknown workflow)'
+      const name = auto.action_name || workflows.find(w => w.id === auto.action_id)?.name
+      return name ? `Task: ${name}` : 'Task: (unknown workflow)'
     }
     if (auto.action_type === 'extraction') return 'No extraction selected'
     if (auto.action_type === 'task') return 'No task selected'

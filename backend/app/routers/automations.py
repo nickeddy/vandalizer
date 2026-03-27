@@ -65,7 +65,32 @@ async def _authorize_existing_documents(document_uuids: list[str], user: User) -
     return authorized_document_uuids
 
 
-def _to_response(auto) -> AutomationResponse:
+async def _resolve_action_name(action_type: str | None, action_id: str | None) -> str | None:
+    """Look up the name/title of the linked workflow or search set."""
+    if not action_id:
+        return None
+    if action_type in ("workflow", "task"):
+        from app.models.workflow import Workflow as WfModel
+        try:
+            wf = await WfModel.get(PydanticObjectId(action_id))
+            return wf.name if wf else None
+        except Exception:
+            return None
+    if action_type == "extraction":
+        from app.models.search_set import SearchSet
+        ss = await SearchSet.find_one(SearchSet.uuid == action_id)
+        if not ss:
+            # Fallback: action_id might be a MongoDB _id
+            try:
+                ss = await SearchSet.get(PydanticObjectId(action_id))
+            except Exception:
+                pass
+        return ss.title if ss else None
+    return None
+
+
+async def _to_response(auto) -> AutomationResponse:
+    action_name = await _resolve_action_name(auto.action_type, auto.action_id)
     return AutomationResponse(
         id=str(auto.id),
         name=auto.name,
@@ -75,6 +100,7 @@ def _to_response(auto) -> AutomationResponse:
         trigger_config=auto.trigger_config,
         action_type=auto.action_type,
         action_id=auto.action_id,
+        action_name=action_name,
         user_id=auto.user_id,
         team_id=auto.team_id,
         shared_with_team=auto.shared_with_team,
@@ -95,7 +121,7 @@ async def create_automation(req: CreateAutomationRequest, user: User = Depends(g
         team_id=team_id, shared_with_team=req.shared_with_team,
         output_config=req.output_config,
     )
-    return _to_response(auto)
+    return await _to_response(auto)
 
 
 @router.get("", response_model=list[AutomationResponse])
@@ -104,7 +130,7 @@ async def list_automations(user: User = Depends(get_current_user)):
     automations = await svc.list_automations(
         user_id=user.user_id, team_id=team_id,
     )
-    return [_to_response(a) for a in automations]
+    return [await _to_response(a) for a in automations]
 
 
 @router.get("/active")
@@ -290,7 +316,7 @@ async def get_automation(automation_id: str, user: User = Depends(get_current_us
     auto = await svc.get_automation(automation_id, user=user)
     if not auto:
         raise HTTPException(status_code=404, detail="Automation not found")
-    return _to_response(auto)
+    return await _to_response(auto)
 
 
 @router.patch("/{automation_id}", response_model=AutomationResponse)
@@ -318,7 +344,7 @@ async def update_automation(automation_id: str, req: UpdateAutomationRequest, us
     )
     if not auto:
         raise HTTPException(status_code=404, detail="Automation not found")
-    return _to_response(auto)
+    return await _to_response(auto)
 
 
 @router.delete("/{automation_id}")

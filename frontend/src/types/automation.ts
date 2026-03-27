@@ -10,6 +10,7 @@ export interface Automation {
   trigger_config: Record<string, unknown>
   action_type: ActionType
   action_id: string | null
+  action_name: string | null
   user_id: string
   team_id: string | null
   shared_with_team: boolean

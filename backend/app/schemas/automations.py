@@ -67,6 +67,7 @@ class AutomationResponse(BaseModel):
     trigger_config: dict
     action_type: str
     action_id: Optional[str] = None
+    action_name: Optional[str] = None
     user_id: str
     team_id: Optional[str] = None
     shared_with_team: bool = False
