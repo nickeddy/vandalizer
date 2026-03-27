@@ -66,6 +66,25 @@ async def delete(
     return {"ok": True}
 
 
+@router.patch("/{folder_uuid}/convert-to-team")
+async def convert_to_team(
+    folder_uuid: str,
+    user: User = Depends(get_current_user),
+):
+    try:
+        folder = await folder_service.convert_to_team_folder(folder_uuid, user)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {
+        "id": str(folder.id),
+        "uuid": folder.uuid,
+        "title": folder.title,
+        "parent_id": folder.parent_id,
+        "is_shared_team_root": folder.is_shared_team_root,
+        "team_id": folder.team_id,
+    }
+
+
 @router.get("/all")
 async def list_all_folders(
     user: User = Depends(get_current_user),

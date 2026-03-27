@@ -68,6 +68,49 @@ async def delete_folder(folder_uuid: str, user: User) -> bool:
     return True
 
 
+async def convert_to_team_folder(folder_uuid: str, user: User) -> SmartFolder:
+    """Convert a personal folder (and all its descendants) to a team folder."""
+    folder = await access_control.get_authorized_folder(folder_uuid, user, manage=True)
+    if not folder:
+        raise ValueError("Folder not found.")
+    if folder.team_id:
+        raise ValueError("Folder is already a team folder.")
+    if not user.current_team:
+        raise ValueError("You are not on a team.")
+
+    from app.models.team import Team
+
+    team = await Team.get(user.current_team)
+    if not team:
+        raise ValueError("Team not found.")
+
+    team_access = await access_control.get_team_access_context(user)
+    if team.uuid not in team_access.team_uuids and not user.is_admin:
+        raise ValueError("Not a member of this team.")
+
+    # Collect this folder and all descendants
+    folder_uuids = [folder_uuid]
+    frontier = [folder_uuid]
+    while frontier:
+        children = await SmartFolder.find({"parent_id": {"$in": frontier}}).to_list()
+        frontier = [child.uuid for child in children]
+        folder_uuids.extend(frontier)
+
+    # Update all folders to team ownership
+    await SmartFolder.find({"uuid": {"$in": folder_uuids}}).update(
+        {"$set": {"team_id": team.uuid, "user_id": None}}
+    )
+
+    # Update all documents in those folders to team ownership
+    await SmartDocument.find({"folder": {"$in": folder_uuids}}).update(
+        {"$set": {"team_id": team.uuid}}
+    )
+
+    # Refresh and return
+    folder = await SmartFolder.find_one(SmartFolder.uuid == folder_uuid)
+    return folder
+
+
 async def get_breadcrumbs(folder_uuid: str, user: User) -> list[dict] | None:
     current = await access_control.get_authorized_folder(folder_uuid, user)
     if not current:

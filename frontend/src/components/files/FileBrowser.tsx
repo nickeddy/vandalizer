@@ -12,7 +12,7 @@ import { ContextMenu } from './ContextMenu'
 import { RenameDialog } from './RenameDialog'
 import { CreateFolderDialog } from './CreateFolderDialog'
 import { deleteFile, renameFile, downloadFile, downloadFilesAsZip, moveFile } from '../../api/files'
-import { createFolder, renameFolder, deleteFolder } from '../../api/folders'
+import { createFolder, renameFolder, deleteFolder, convertFolderToTeam } from '../../api/folders'
 import { listAutomations } from '../../api/automations'
 import type { Document, Folder } from '../../types/document'
 
@@ -537,6 +537,18 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
           onCopyUuid={() => {
             navigator.clipboard.writeText(contextMenu.item.uuid)
           }}
+          onConvertToTeam={
+            contextMenu.type === 'folder' && currentTeam && !(contextMenu.item as Folder).team_id
+              ? async () => {
+                  try {
+                    await convertFolderToTeam(contextMenu.item.uuid)
+                    refresh()
+                  } catch (err: unknown) {
+                    alert(err instanceof Error ? err.message : 'Failed to convert folder')
+                  }
+                }
+              : undefined
+          }
         />
       )}
 
