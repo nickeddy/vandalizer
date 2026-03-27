@@ -256,18 +256,15 @@ case "$input_choice" in
     echo -e "  ${DIM}Sending: $(basename "$file_path")${RESET}"
     ;;
   2)
-    echo -e "  ${DIM}Type or paste your text, then press Enter twice (blank line) to send:${RESET}"
-    echo -ne "  > "
-    text_input=""
-    while IFS= read -r line; do
-      [[ -z "$line" ]] && break
-      [[ -n "$text_input" ]] && text_input="${text_input}"$'\n'
-      text_input="${text_input}${line}"
-      echo -ne "  > "
-    done
+    echo -e "  ${DIM}Paste or type your text. Press Ctrl-D on a blank line when done.${RESET}"
+    echo ""
+    text_input=$(cat)
+    echo ""
     if [[ -z "$text_input" ]]; then
       fail "No text provided."
     fi
+    local_len=${#text_input}
+    echo -e "  ${DIM}Captured ${local_len} characters.${RESET}"
     printf '%s' "$text_input" > "${TMP_DIR}/input_text"
     CURL_ARGS+=(-F "text=<${TMP_DIR}/input_text")
     ;;
