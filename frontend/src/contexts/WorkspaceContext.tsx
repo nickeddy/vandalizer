@@ -14,8 +14,9 @@ interface NavigationContextValue {
   activeRightTab: RightTab
   setActiveRightTab: (tab: RightTab) => void
   openWorkflowId: string | null
-  openWorkflow: (id: string) => void
+  openWorkflow: (id: string, sessionId?: string) => void
   closeWorkflow: () => void
+  consumeWorkflowSession: () => string | null
   openExtractionId: string | null
   openExtraction: (uuid: string, initialResults?: Record<string, string>) => void
   closeExtraction: () => void
@@ -162,6 +163,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [activeKBTitle, setActiveKBTitle] = useState<string | null>(null)
   const [viewDocumentRequest, setViewDocumentRequest] = useState<{ uuid: string; title: string } | null>(null)
   const pendingExtractionResultsRef = useRef<Record<string, string> | null>(null)
+  const pendingWorkflowSessionRef = useRef<string | null>(null)
 
   const updateSearch = useCallback(
     (updater: (prev: WorkspaceSearchState) => WorkspaceSearchState) => {
@@ -184,13 +186,21 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     updateSearch((prev) => ({ ...prev, tab: tab === 'assistant' ? undefined : tab }))
   }, [updateSearch])
 
-  const openWorkflow = useCallback((id: string) => {
+  const openWorkflow = useCallback((id: string, sessionId?: string) => {
+    pendingWorkflowSessionRef.current = sessionId ?? null
     updateSearch((prev) => ({ ...prev, workflow: id, extraction: undefined, automation: undefined }))
   }, [updateSearch])
 
   const closeWorkflow = useCallback(() => {
+    pendingWorkflowSessionRef.current = null
     updateSearch((prev) => ({ ...prev, workflow: undefined }))
   }, [updateSearch])
+
+  const consumeWorkflowSession = useCallback((): string | null => {
+    const s = pendingWorkflowSessionRef.current
+    pendingWorkflowSessionRef.current = null
+    return s
+  }, [])
 
   const openExtraction = useCallback((uuid: string, initialResults?: Record<string, string>) => {
     pendingExtractionResultsRef.current = initialResults ?? null
@@ -316,7 +326,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const navValue = useMemo<NavigationContextValue>(() => ({
     workspaceMode, setWorkspaceMode,
     activeRightTab, setActiveRightTab,
-    openWorkflowId, openWorkflow, closeWorkflow,
+    openWorkflowId, openWorkflow, closeWorkflow, consumeWorkflowSession,
     openExtractionId, openExtraction, closeExtraction,
     consumeExtractionResults,
     openAutomationId, openAutomation, closeAutomation,
@@ -324,7 +334,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   }), [
     workspaceMode, setWorkspaceMode,
     activeRightTab, setActiveRightTab,
-    openWorkflowId, openWorkflow, closeWorkflow,
+    openWorkflowId, openWorkflow, closeWorkflow, consumeWorkflowSession,
     openExtractionId, openExtraction, closeExtraction,
     consumeExtractionResults,
     openAutomationId, openAutomation, closeAutomation,

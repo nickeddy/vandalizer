@@ -99,7 +99,7 @@ export function ActivityRail() {
         setActiveRightTab('assistant')
         setLoadConversationId(activity.conversation_id)
       } else if (activity.type === 'workflow_run' && activity.workflow_id) {
-        openWorkflow(activity.workflow_id)
+        openWorkflow(activity.workflow_id, activity.workflow_session_id ?? undefined)
       } else if (activity.type === 'search_set_run' && activity.search_set_uuid) {
         // Restore the extraction results from the activity snapshot so the
         // editor re-opens with values rather than a blank slate.

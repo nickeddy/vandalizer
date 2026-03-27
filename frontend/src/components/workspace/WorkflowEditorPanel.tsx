@@ -134,7 +134,7 @@ const TEST_MESSAGES = [
 // ---------------------------------------------------------------------------
 
 export function WorkflowEditorPanel() {
-  const { openWorkflowId, openWorkflow, closeWorkflow, selectedDocUuids, bumpActivitySignal } = useWorkspace()
+  const { openWorkflowId, openWorkflow, closeWorkflow, consumeWorkflowSession, selectedDocUuids, bumpActivitySignal } = useWorkspace()
   const [workflow, setWorkflow] = useState<Workflow | null>(null)
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<Tab>('design')
@@ -181,6 +181,14 @@ export function WorkflowEditorPanel() {
   }, [openWorkflowId, refreshSparkline])
 
   useEffect(() => { refresh() }, [refresh])
+
+  // Load results from a pending session (e.g. clicking a completed activity)
+  useEffect(() => {
+    const sid = consumeWorkflowSession()
+    if (sid) {
+      runner.loadSession(sid)
+    }
+  }, [openWorkflowId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Fetch quality status on mount
   useEffect(() => {

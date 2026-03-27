@@ -537,6 +537,8 @@ async def run_workflow(request: Request, workflow_id: str, req: RunWorkflowReque
                 activity_id=str(activity.id),
                 user=user,
             )
+            activity.workflow_session_id = session_id
+            await activity.save()
             return {"session_id": session_id, "activity_id": str(activity.id)}
     except ValueError as e:
         from app.models.activity import ActivityStatus

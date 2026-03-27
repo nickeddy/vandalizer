@@ -43,6 +43,7 @@ class ActivityEvent(Document):
     search_set_uuid: Optional[str] = None
     workflow_result: Optional[PydanticObjectId] = None
     workflow: Optional[PydanticObjectId] = None
+    workflow_session_id: Optional[str] = None
 
     message_count: int = 0
     tokens_input: int = 0
@@ -86,6 +87,7 @@ class ActivityEvent(Document):
             "conversation_id": self.conversation_id,
             "search_set_uuid": self.search_set_uuid,
             "workflow_id": str(self.workflow) if self.workflow else None,
+            "workflow_session_id": self.workflow_session_id,
             "started_at": self.started_at.isoformat() if self.started_at else None,
             "finished_at": self.finished_at.isoformat() if self.finished_at else None,
             "error": self.error or "",

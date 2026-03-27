@@ -71,6 +71,20 @@ export function useWorkflowRunner() {
     }
   }, [poll, pollBatch, bumpActivitySignal])
 
+  const loadSession = useCallback(async (sid: string) => {
+    stopPolling()
+    setSessionId(sid)
+    setBatchId(null)
+    setBatchStatus(null)
+    setRunning(false)
+    try {
+      const s = await getWorkflowStatus(sid)
+      setStatus(s)
+    } catch {
+      setStatus(null)
+    }
+  }, [stopPolling])
+
   const reset = useCallback(() => {
     setSessionId(null)
     setBatchId(null)
@@ -85,5 +99,5 @@ export function useWorkflowRunner() {
     return () => stopPolling()
   }, [stopPolling])
 
-  return { sessionId, batchId, status, batchStatus, running, start, reset }
+  return { sessionId, batchId, status, batchStatus, running, start, loadSession, reset }
 }

@@ -37,6 +37,7 @@ export interface ActivityEvent {
   conversation_id: string | null
   search_set_uuid: string | null
   workflow_id: string | null
+  workflow_session_id: string | null
   started_at: string | null
   finished_at: string | null
   error: string
