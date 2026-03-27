@@ -2107,8 +2107,9 @@ function ValidateTab({
     try {
       const res = await getExtractionImprovementSuggestions(searchSetUuid)
       setSuggestions(res.suggestions)
-    } catch {
-      setSuggestions('Failed to generate suggestions. Please try again.')
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Unknown error'
+      setSuggestions(`Failed to generate suggestions: ${msg}`)
     } finally {
       setLoadingSuggestions(false)
     }

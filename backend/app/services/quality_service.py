@@ -415,45 +415,45 @@ async def generate_improvement_suggestions(
     For workflows: analyses failing/warning checks and suggests fixes.
     Returns a markdown string of suggestions.
     """
-    from app.services.config_service import get_default_model_name
-    from app.services.llm_service import create_chat_agent
-
-    sys_cfg = await SystemConfig.get_config()
-    sys_config_doc = sys_cfg.model_dump() if sys_cfg else {}
-
-    # Use the same model resolution path as chat/extraction
-    default_model = await get_default_model_name()
-    if not default_model:
-        default_model = "gpt-4o-mini"
-
-    if item_kind == "search_set":
-        prompt = _build_extraction_suggestion_prompt(result)
-    elif item_kind == "knowledge_base":
-        prompt = _build_kb_suggestion_prompt(result)
-    else:
-        prompt = _build_workflow_suggestion_prompt(result)
-
-    agent = create_chat_agent(
-        default_model,
-        system_prompt=(
-            "You help users improve LLM-based document extraction results. "
-            "The user configures extractions by defining field names (called 'extraction keys') "
-            "and optionally constraining them with enum values. The system sends these keys to an LLM "
-            "which reads a document and returns values for each key.\n\n"
-            "The ONLY things a user can change to improve results are:\n"
-            "- Rename extraction keys to be clearer or more specific (e.g. 'name' → 'PI Full Name')\n"
-            "- Add enum values to constrain a field to specific allowed values\n"
-            "- Mark fields as optional if they don't always appear\n"
-            "- Switch between one-pass and two-pass extraction modes\n"
-            "- Enable or disable 'thinking' mode for the LLM\n"
-            "- Change the LLM model\n\n"
-            "Rules: Maximum 3-5 bullet points. No headings, no preamble. "
-            "Each bullet is one specific, actionable sentence referencing the actual field names from the results. "
-            "NEVER suggest training data, fine-tuning, regex post-processing, or anything outside the above options."
-        ),
-        system_config_doc=sys_config_doc,
-    )
     try:
+        from app.services.config_service import get_default_model_name
+        from app.services.llm_service import create_chat_agent
+
+        sys_cfg = await SystemConfig.get_config()
+        sys_config_doc = sys_cfg.model_dump() if sys_cfg else {}
+
+        # Use the same model resolution path as chat/extraction
+        default_model = await get_default_model_name()
+        if not default_model:
+            default_model = "gpt-4o-mini"
+
+        if item_kind == "search_set":
+            prompt = _build_extraction_suggestion_prompt(result)
+        elif item_kind == "knowledge_base":
+            prompt = _build_kb_suggestion_prompt(result)
+        else:
+            prompt = _build_workflow_suggestion_prompt(result)
+
+        agent = create_chat_agent(
+            default_model,
+            system_prompt=(
+                "You help users improve LLM-based document extraction results. "
+                "The user configures extractions by defining field names (called 'extraction keys') "
+                "and optionally constraining them with enum values. The system sends these keys to an LLM "
+                "which reads a document and returns values for each key.\n\n"
+                "The ONLY things a user can change to improve results are:\n"
+                "- Rename extraction keys to be clearer or more specific (e.g. 'name' → 'PI Full Name')\n"
+                "- Add enum values to constrain a field to specific allowed values\n"
+                "- Mark fields as optional if they don't always appear\n"
+                "- Switch between one-pass and two-pass extraction modes\n"
+                "- Enable or disable 'thinking' mode for the LLM\n"
+                "- Change the LLM model\n\n"
+                "Rules: Maximum 3-5 bullet points. No headings, no preamble. "
+                "Each bullet is one specific, actionable sentence referencing the actual field names from the results. "
+                "NEVER suggest training data, fine-tuning, regex post-processing, or anything outside the above options."
+            ),
+            system_config_doc=sys_config_doc,
+        )
         res = await agent.run(prompt)
         return res.output
     except Exception as exc:
