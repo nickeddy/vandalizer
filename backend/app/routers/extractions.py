@@ -921,19 +921,38 @@ async def get_extraction_suggestions(
     request: Request,
     uuid: str, user: User = Depends(get_current_user),
 ):
-    """Use LLM to suggest improvements based on the latest validation run."""
+    """Use LLM to suggest improvements based on validation results or field config."""
     await _get_search_set_or_404(uuid, user)
     from app.services.quality_service import get_latest_validation, generate_improvement_suggestions
 
     latest = await get_latest_validation("search_set", uuid)
-    if not latest:
-        raise HTTPException(status_code=404, detail="No validation runs found for this search set")
-    result_snapshot = latest.get("result_snapshot") or {}
+    result_snapshot = (latest.get("result_snapshot") or {}) if latest else {}
+
+    # If no validation run or no test cases, build a basic snapshot from field config
     if not result_snapshot.get("test_cases"):
-        raise HTTPException(
-            status_code=400,
-            detail="The latest validation run has no per-field detail. Run validation again to generate improvement suggestions.",
-        )
+        items = await svc.list_items(uuid)
+        result_snapshot = {
+            "aggregate_accuracy": None,
+            "aggregate_consistency": None,
+            "test_cases": [{
+                "label": "Field Configuration Review",
+                "overall_accuracy": None,
+                "overall_consistency": None,
+                "fields": [
+                    {
+                        "field_name": item.searchphrase,
+                        "expected": "N/A",
+                        "most_common_value": "not yet run",
+                        "accuracy": None,
+                        "consistency": None,
+                        "is_optional": item.is_optional,
+                        "enum_values": item.enum_values,
+                    }
+                    for item in items if item.searchphrase
+                ],
+            }],
+        }
+
     suggestions = await generate_improvement_suggestions("search_set", uuid, result_snapshot)
     return {"suggestions": suggestions}
 
