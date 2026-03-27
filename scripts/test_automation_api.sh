@@ -546,7 +546,19 @@ do_trigger() {
 
   local text_input="" doc_uuids="" file_paths=""
 
-  prompt_input "Text input ${DIM}(Enter to skip)${RESET}" "" text_input
+  # Multi-line text input: read until a blank line or EOF (Ctrl-D).
+  echo -ne "  ${SYM_ARROW}  Text input ${DIM}(Enter to skip, or paste text then press Enter twice)${RESET}: "
+  local first_line
+  read -r first_line
+  if [[ -n "$first_line" ]]; then
+    text_input="$first_line"
+    local line
+    while IFS= read -r line; do
+      [[ -z "$line" ]] && break
+      text_input="${text_input}"$'\n'"${line}"
+    done
+  fi
+
   prompt_input "Document UUIDs ${DIM}(comma-separated, Enter to skip)${RESET}" "" doc_uuids
   prompt_input "File paths ${DIM}(comma-separated, Enter to skip)${RESET}" "" file_paths
 
@@ -560,13 +572,18 @@ do_trigger() {
   curl_args+=(-X POST "${BASE_URL}/api/automations/${auto_id}/trigger")
   curl_args+=(-H "x-api-key: ${key}")
 
-  [[ -n "$text_input" ]] && curl_args+=(-F "text=${text_input}")
+  if [[ -n "$text_input" ]]; then
+    # Write to temp file so multi-line text and special chars are safe
+    local text_file="${TMP_DIR}/trigger_text"
+    printf '%s' "$text_input" > "$text_file"
+    curl_args+=(-F "text=<${text_file}")
+  fi
   [[ -n "$doc_uuids" ]] && curl_args+=(-F "document_uuids=${doc_uuids}")
 
   if [[ -n "$file_paths" ]]; then
     IFS=',' read -ra files <<< "$file_paths"
     for f in "${files[@]}"; do
-      f=$(echo "$f" | xargs)  # trim whitespace
+      f="${f#"${f%%[![:space:]]*}"}" ; f="${f%"${f##*[![:space:]]}"}"  # trim whitespace
       if [[ ! -f "$f" ]]; then
         echo -e "  ${SYM_CROSS}  File not found: ${RED}${f}${RESET}"
         return
