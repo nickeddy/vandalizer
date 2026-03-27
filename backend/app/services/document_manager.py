@@ -49,7 +49,10 @@ def _split_text(text: str, chunk_size: int, chunk_overlap: int) -> list[str]:
 class DocumentManager:
     """Synchronous document manager  - safe to call from asyncio.to_thread()."""
 
-    def __init__(self, persist_directory: str = "data/chromadb") -> None:
+    def __init__(self, persist_directory: str | None = None) -> None:
+        if persist_directory is None:
+            from app.config import Settings
+            persist_directory = Settings().chromadb_persist_dir
         self.persist_directory = persist_directory
         self.chunk_size = 1000
         self.chunk_overlap = 200

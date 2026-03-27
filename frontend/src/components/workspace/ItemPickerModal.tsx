@@ -234,7 +234,7 @@ export function ItemPickerModal({ kind, onSelect, onClose, currentId }: Props) {
         {/* Items list */}
         <div style={{
           flex: 1, overflowY: 'auto', padding: '8px 12px 12px',
-          minHeight: 200,
+          minHeight: 0,
         }}>
           {loading ? (
             <div style={{

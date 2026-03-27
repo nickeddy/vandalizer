@@ -64,7 +64,7 @@ async def list_search_sets(
     elif scope == "team":
         if not current_team:
             return []
-        query = {"team_id": current_team}
+        query = {"team_id": current_team, "user_id": {"$ne": user.user_id}}
     else:
         # Default: user's own (in current team) + all current team items
         if current_team:
