@@ -383,7 +383,7 @@ class FormatNode(Node):
         self.model = data.get("model")
 
     def process(self, inputs):
-        formatting_prompt = self.data.get("prompt", "")
+        formatting_prompt = self.data.get("format_template") or self.data.get("prompt", "")
         data = inputs.get("output")
         prev_step_name = inputs.get("step_name")
         self.report_progress(f"Formatter: {formatting_prompt}")
