@@ -16,7 +16,7 @@ from app.models.search_set import SearchSet, SearchSetItem
 from app.models.workflow import Workflow, WorkflowStep, WorkflowStepTask
 from app.services import search_set_service, verification_service, workflow_service
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 
 # ---------------------------------------------------------------------------
@@ -41,8 +41,8 @@ def validate_export_data(data: dict) -> str | None:
         return "Invalid JSON: expected an object"
     if not data.get("vandalizer_export"):
         return "Not a Vandalizer export file (missing vandalizer_export flag)"
-    if data.get("schema_version") != SCHEMA_VERSION:
-        return f"Unsupported schema version (expected {SCHEMA_VERSION})"
+    if data.get("schema_version") not in (1, SCHEMA_VERSION):
+        return f"Unsupported schema version (expected 1 or {SCHEMA_VERSION})"
     if data.get("export_type") not in ("workflow", "search_set", "knowledge_base", "catalog"):
         return "Unknown export_type"
     if not isinstance(data.get("items"), list) or len(data["items"]) == 0:
@@ -55,6 +55,72 @@ def validate_export_data(data: dict) -> str | None:
 # ---------------------------------------------------------------------------
 
 
+async def _resolve_task_references(task_data: dict, task_name: str) -> dict:
+    """Resolve external object references in a task and embed their data inline.
+
+    This makes the export self-contained so it can be imported on a different
+    system that doesn't share the same database.
+    """
+    data = dict(task_data)
+
+    # --- Extraction tasks: embed the search set definition ---
+    if task_name == "Extraction" and data.get("search_set_uuid"):
+        ss_uuid = data["search_set_uuid"]
+        ss = await SearchSet.find_one(SearchSet.uuid == ss_uuid)
+        if ss:
+            items = await SearchSetItem.find(
+                SearchSetItem.searchset == ss_uuid,
+                SearchSetItem.searchtype == "extraction",
+            ).to_list()
+            # Respect item_order
+            if ss.item_order:
+                order_map = {oid: idx for idx, oid in enumerate(ss.item_order)}
+                items.sort(key=lambda i: order_map.get(str(i.id), len(order_map)))
+
+            data["_embedded_search_set"] = {
+                "title": ss.title,
+                "extraction_config": ss.extraction_config,
+                "domain": ss.domain,
+                "cross_field_rules": ss.cross_field_rules,
+                "items": [
+                    {
+                        "searchphrase": it.searchphrase,
+                        "searchtype": it.searchtype,
+                        "title": it.title,
+                        "is_optional": it.is_optional,
+                        "enum_values": it.enum_values,
+                    }
+                    for it in items
+                ],
+            }
+
+    # --- KnowledgeBaseQuery tasks: embed KB metadata ---
+    if task_name == "KnowledgeBaseQuery" and data.get("kb_uuid"):
+        from app.models.knowledge import KnowledgeBase
+        kb = await KnowledgeBase.find_one(KnowledgeBase.uuid == data["kb_uuid"])
+        if kb:
+            data["_embedded_knowledge_base"] = {
+                "title": kb.title,
+                "description": kb.description,
+            }
+
+    # --- Tasks with selected_document_uuid: embed document title ---
+    if data.get("input_source") == "select_document" and data.get("selected_document_uuid"):
+        from app.models.document import SmartDocument
+        doc = await SmartDocument.find_one(
+            SmartDocument.uuid == data["selected_document_uuid"]
+        )
+        if doc:
+            data["_embedded_document_ref"] = {
+                "title": getattr(doc, "title", None) or getattr(doc, "filename", None) or "Unknown",
+                "uuid": data["selected_document_uuid"],
+                "_portable": False,
+                "_note": "This task references a specific document that must be re-selected after import.",
+            }
+
+    return data
+
+
 async def export_workflow(workflow_id: str, user_email: str) -> dict:
     wf_data = await workflow_service.get_workflow(workflow_id)
     if not wf_data:
@@ -64,11 +130,25 @@ async def export_workflow(workflow_id: str, user_email: str) -> dict:
     wf = await Workflow.get(PydanticObjectId(workflow_id))
 
     steps = []
+    portability_warnings: list[str] = []
     for step in wf_data.get("steps", []):
-        tasks = [
-            {"name": t["name"], "data": t.get("data", {})}
-            for t in step.get("tasks", [])
-        ]
+        tasks = []
+        for t in step.get("tasks", []):
+            resolved_data = await _resolve_task_references(t.get("data", {}), t["name"])
+            tasks.append({"name": t["name"], "data": resolved_data})
+
+            # Collect portability warnings for the user
+            if resolved_data.get("_embedded_document_ref"):
+                portability_warnings.append(
+                    f"Step '{step['name']}' references a specific document "
+                    f"(\"{resolved_data['_embedded_document_ref']['title']}\") "
+                    f"that will need to be re-selected after import."
+                )
+            if t["name"] == "KnowledgeBaseQuery" and resolved_data.get("kb_uuid") and not resolved_data.get("_embedded_knowledge_base"):
+                portability_warnings.append(
+                    f"Step '{step['name']}' references a knowledge base that could not be found."
+                )
+
         steps.append({
             "name": step["name"],
             "data": step.get("data", {}),
@@ -96,7 +176,80 @@ async def export_workflow(workflow_id: str, user_email: str) -> dict:
         "validation_plan": wf.validation_plan if wf else [],
         "validation_inputs": validation_inputs,
     }
+    if portability_warnings:
+        item["portability_warnings"] = portability_warnings
     return _envelope("workflow", user_email, [item])
+
+
+async def _reconstruct_task_references(
+    task_data: dict,
+    task_name: str,
+    user_id: str,
+    team_id: str | None,
+) -> dict:
+    """Reconstruct external objects from embedded data in an imported task.
+
+    For v2 exports, embedded search set / KB data is used to create new local
+    objects.  For v1 exports (no embedded data), the original UUID references
+    are preserved as-is (they may or may not work on the target system).
+    """
+    data = dict(task_data)
+
+    # --- Extraction tasks: create a new SearchSet from embedded data ---
+    if task_name == "Extraction" and data.get("_embedded_search_set"):
+        embedded = data.pop("_embedded_search_set")
+        new_uuid = str(uuid_mod.uuid4())
+        new_ss = SearchSet(
+            title=f"{embedded['title']} (Imported)",
+            uuid=new_uuid,
+            status="active",
+            set_type="extraction",
+            user_id=user_id,
+            team_id=team_id,
+            created_by_user_id=user_id,
+            extraction_config=embedded.get("extraction_config", {}),
+            domain=embedded.get("domain"),
+            cross_field_rules=embedded.get("cross_field_rules", []),
+        )
+        await new_ss.insert()
+
+        for field in embedded.get("items", []):
+            new_item = SearchSetItem(
+                searchphrase=field["searchphrase"],
+                searchset=new_uuid,
+                searchtype=field.get("searchtype", "extraction"),
+                title=field.get("title", field["searchphrase"]),
+                user_id=user_id,
+                is_optional=field.get("is_optional", False),
+                enum_values=field.get("enum_values", []),
+            )
+            await new_item.insert()
+
+        # Point the task at the newly created search set
+        data["search_set_uuid"] = new_uuid
+
+    # --- KnowledgeBaseQuery: clear stale UUID, keep metadata for user ---
+    if task_name == "KnowledgeBaseQuery" and data.get("_embedded_knowledge_base"):
+        # The original kb_uuid won't exist on the target system.
+        # Clear it so the workflow doesn't silently fail; the user will need
+        # to select a local knowledge base.
+        embedded_kb = data.pop("_embedded_knowledge_base")
+        data["kb_uuid"] = ""
+        data["_import_note"] = (
+            f"Originally referenced knowledge base \"{embedded_kb.get('title', 'Unknown')}\". "
+            f"Please select a local knowledge base for this step."
+        )
+
+    # --- Document references: clear stale UUID ---
+    if data.get("_embedded_document_ref"):
+        ref = data.pop("_embedded_document_ref")
+        data["selected_document_uuid"] = ""
+        data["_import_note"] = (
+            f"Originally referenced document \"{ref.get('title', 'Unknown')}\". "
+            f"Please select a local document for this step."
+        )
+
+    return data
 
 
 async def import_workflow(
@@ -113,15 +266,17 @@ async def import_workflow(
 
     item = data["items"][0]
 
-    # Create steps and tasks first so the workflow can be inserted in a
-    # single write with all step references already populated.
+    # Create steps and tasks, reconstructing external objects from embedded data.
     new_step_ids = []
     for step_data in item.get("steps", []):
         new_task_ids = []
         for task_data in step_data.get("tasks", []):
+            resolved_data = await _reconstruct_task_references(
+                task_data.get("data", {}), task_data["name"], user_id, team_id,
+            )
             new_task = WorkflowStepTask(
                 name=task_data["name"],
-                data=task_data.get("data", {}),
+                data=resolved_data,
             )
             await new_task.insert()
             new_task_ids.append(new_task.id)
