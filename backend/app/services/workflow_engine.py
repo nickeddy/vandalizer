@@ -158,15 +158,21 @@ def format_model(model: str, formatting_prompt: str, text, system_config_doc: di
                  usage_acc: UsageAccumulator | None = None):
     """Format text via LLM. Returns (prompt, formatted_text)."""
     system_prompt = (
-        "You are a document formatter. The user will give you an instruction describing "
-        "how to format the provided text. Follow their instruction exactly.\n"
+        "You are a document formatter. You will receive a formatting instruction and "
+        "source text. Your ONLY job is to reformat the source text exactly as the "
+        "instruction says. Follow the instruction literally.\n"
         "RULES:\n"
+        "- The formatting instruction is ABSOLUTE. If it says poem, output a poem. "
+        "If it says bullet list, output a bullet list. Do not second-guess it.\n"
         "- Output clean markdown. Do NOT wrap your response in code fences.\n"
-        "- Never output raw JSON.\n"
-        "- The user's formatting instruction takes priority over everything else."
+        "- Never output raw JSON."
     )
-    prompt = f"{system_prompt}\n\n Instruction: {formatting_prompt}\n\n {text}"
-    chat_agent = create_chat_agent(model, system_config_doc=system_config_doc)
+    prompt = (
+        f"FORMATTING INSTRUCTION:\n{formatting_prompt}\n\n"
+        f"---\n\n"
+        f"SOURCE TEXT:\n{text}"
+    )
+    chat_agent = create_chat_agent(model, system_prompt=system_prompt, system_config_doc=system_config_doc)
     response = chat_agent.run_sync(prompt)
     if usage_acc:
         usage_acc.record(response)
