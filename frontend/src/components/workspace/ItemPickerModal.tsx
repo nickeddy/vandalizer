@@ -19,9 +19,11 @@ interface Props {
   onSelect: (id: string, name: string) => void
   onClose: () => void
   currentId?: string
+  /** When true, fills the parent container instead of using a fixed viewport overlay */
+  inline?: boolean
 }
 
-export function ItemPickerModal({ kind, onSelect, onClose, currentId }: Props) {
+export function ItemPickerModal({ kind, onSelect, onClose, currentId, inline }: Props) {
   const { user } = useAuth()
   const teamId = user?.current_team ?? undefined
   const [scope, setScope] = useState<ScopeTab>('mine')
@@ -140,7 +142,12 @@ export function ItemPickerModal({ kind, onSelect, onClose, currentId }: Props) {
     <div
       ref={backdropRef}
       onClick={e => { if (e.target === backdropRef.current) onClose() }}
-      style={{
+      style={inline ? {
+        position: 'absolute', inset: 0, zIndex: 50,
+        backgroundColor: 'rgba(0,0,0,0.3)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: 16,
+      } : {
         position: 'fixed', inset: 0, zIndex: 9999,
         backgroundColor: 'rgba(0,0,0,0.5)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -149,7 +156,7 @@ export function ItemPickerModal({ kind, onSelect, onClose, currentId }: Props) {
     >
       <div style={{
         backgroundColor: '#fff', borderRadius: 12,
-        width: '100%', maxWidth: 560, maxHeight: '80vh',
+        width: '100%', maxWidth: inline ? 480 : 560, maxHeight: inline ? '90%' : '80vh',
         display: 'flex', flexDirection: 'column',
         boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)',
       }}>

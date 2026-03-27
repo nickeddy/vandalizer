@@ -1791,6 +1791,7 @@ function TaskEditModal({ task, selectedDocUuids, onClose, onSave }: {
                       currentId={getTextValue('search_set_uuid') || undefined}
                       onSelect={handleSelectSavedSet}
                       onClose={() => setShowSetPicker(false)}
+                      inline
                     />
                   )}
                 </div>
