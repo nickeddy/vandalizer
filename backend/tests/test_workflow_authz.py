@@ -362,7 +362,7 @@ class TestWorkflowRunAuthz:
         mock_wf_doc.name = "Test WF"
         mock_wf_doc.steps = [MagicMock(), MagicMock()]
 
-        mock_activity_obj = MagicMock()
+        mock_activity_obj = AsyncMock()
         mock_activity_obj.id = "activity-1"
 
         with patch("app.dependencies.decode_token", return_value={"sub": "user1", "type": "access"}), \

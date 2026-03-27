@@ -216,16 +216,21 @@ async def chat_stream(
 
     # KB context: query ChromaDB for relevant chunks
     if kb_uuid:
-        import asyncio
-        from app.services.document_manager import DocumentManager
-        dm = DocumentManager()
-        kb_results = await asyncio.to_thread(dm.query_kb, kb_uuid, message, 8)
-        if kb_results:
-            kb_text = "\n\n## Knowledge Base Context:\n"
-            for r in kb_results:
-                src = r.get("metadata", {}).get("source_name", "Unknown")
-                kb_text += f"\n**Source: {src}**\n{r['content']}\n"
-            parts.append(kb_text)
+        try:
+            import asyncio
+            from app.services.document_manager import DocumentManager
+            dm = DocumentManager()
+            kb_results = await asyncio.to_thread(dm.query_kb, kb_uuid, message, 8)
+            if kb_results:
+                kb_text = "\n\n## Knowledge Base Context:\n"
+                for r in kb_results:
+                    src = r.get("metadata", {}).get("source_name", "Unknown")
+                    kb_text += f"\n**Source: {src}**\n{r['content']}\n"
+                parts.append(kb_text)
+            else:
+                logger.warning("KB query returned no results for kb_uuid=%s", kb_uuid)
+        except Exception as e:
+            logger.error("KB context retrieval failed for kb_uuid=%s: %s", kb_uuid, e)
 
     if full_text:
         parts.append(full_text)
