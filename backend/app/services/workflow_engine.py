@@ -158,10 +158,12 @@ def format_model(model: str, formatting_prompt: str, text, system_config_doc: di
                  usage_acc: UsageAccumulator | None = None):
     """Format text via LLM. Returns (prompt, formatted_text)."""
     system_prompt = (
-        "Follow the instruction and output your answer as a nicely formatted markdown "
-        "to display in a web interface chat bot.\nCRITICAL:\n"
-        "- The formatted text should be a list of bullet points with the extracted data json data.\n"
-        "- The bullet points should be in a list format."
+        "Follow the instruction and output your answer as nicely formatted markdown "
+        "suitable for display in a web interface.\n"
+        "CRITICAL:\n"
+        "- Output clean markdown directly. Do NOT wrap your response in code fences.\n"
+        "- Use headings, bullet points, bold, and tables as appropriate for readability.\n"
+        "- Never output raw JSON. Always present data in human-readable markdown."
     )
     prompt = f"{system_prompt}\n\n Instruction: {formatting_prompt}\n\n {text}"
     chat_agent = create_chat_agent(model, system_config_doc=system_config_doc)
@@ -171,11 +173,6 @@ def format_model(model: str, formatting_prompt: str, text, system_config_doc: di
     output = response.output
     if output is None:
         return None, None
-    format_spec_regex = r"```(.*?)\n(.*?)\n```"
-    match = re.search(format_spec_regex, output, re.DOTALL)
-    if match is not None:
-        formatted_text = match.group(2)
-        return prompt, formatted_text
     return prompt, output
 
 
@@ -878,7 +875,8 @@ class KnowledgeBaseQueryNode(Node):
 
         self.report_progress("Querying knowledge base…")
 
-        dm = DocumentManager()
+        from app.config import Settings
+        dm = DocumentManager(persist_directory=Settings().chromadb_persist_dir)
         results = dm.query_kb(kb_uuid, query, k=k)
 
         if not results:
