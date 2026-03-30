@@ -249,10 +249,10 @@ async def revoke_api_token(user: User = Depends(get_current_user)):
 async def api_token_status(user: User = Depends(get_current_user)):
     """Check if the current user has an active API token."""
     now = datetime.datetime.now(datetime.timezone.utc)
-    expired = (
-        user.api_token_expires_at is not None
-        and user.api_token_expires_at < now
-    )
+    expires = user.api_token_expires_at
+    if expires is not None and expires.tzinfo is None:
+        expires = expires.replace(tzinfo=datetime.timezone.utc)
+    expired = expires is not None and expires < now
     return {
         "has_token": user.api_token is not None,
         "created_at": user.api_token_created_at.isoformat() if user.api_token_created_at else None,

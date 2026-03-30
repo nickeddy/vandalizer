@@ -106,6 +106,25 @@ def _app_error_handler(request: Request, exc: AppError):
 app.add_exception_handler(AppError, _app_error_handler)
 
 
+# In development, return the full traceback in the response so errors are
+# immediately visible in API test tools and scripts.
+if not _boot_settings.is_production:
+    import traceback as _tb
+
+    async def _dev_unhandled_error(request: Request, exc: Exception):
+        tb = _tb.format_exception(type(exc), exc, exc.__traceback__)
+        logger.error("Unhandled exception:\n%s", "".join(tb))
+        return JSONResponse(
+            status_code=500,
+            content={
+                "detail": str(exc),
+                "traceback": "".join(tb),
+            },
+        )
+
+    app.add_exception_handler(Exception, _dev_unhandled_error)
+
+
 # ---------------------------------------------------------------------------
 # Security headers middleware
 # ---------------------------------------------------------------------------

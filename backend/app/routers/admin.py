@@ -1142,6 +1142,7 @@ async def get_config(
         "highlight_color": cfg.highlight_color,
         "ui_radius": cfg.ui_radius,
         "default_team_id": cfg.default_team_id or "",
+        "support_contacts": cfg.support_contacts,
     }
 
 

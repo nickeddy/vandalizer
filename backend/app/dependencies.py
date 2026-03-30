@@ -51,12 +51,16 @@ async def get_api_key_user(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid API key",
         )
-    # Check token expiry
-    if user.api_token_expires_at and user.api_token_expires_at < datetime.datetime.now(datetime.timezone.utc):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="API key expired",
-        )
+    # Check token expiry — stored value may be naive (UTC assumed)
+    expires = user.api_token_expires_at
+    if expires is not None:
+        if expires.tzinfo is None:
+            expires = expires.replace(tzinfo=datetime.timezone.utc)
+        if expires < datetime.datetime.now(datetime.timezone.utc):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="API key expired",
+            )
     # Block locked demo users from API key access too
     if user.is_demo_user and user.demo_status == "locked":
         raise HTTPException(

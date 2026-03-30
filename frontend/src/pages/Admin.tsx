@@ -2340,10 +2340,10 @@ function ConfigTab() {
     }
   }
 
-  const handleSaveSupportContacts = async () => {
+  const saveSupportContacts = async (contacts: typeof supportContacts) => {
     setSupportSaving(true)
     try {
-      await updateSystemConfig({ support_contacts: supportContacts } as Record<string, unknown>)
+      await updateSystemConfig({ support_contacts: contacts } as Record<string, unknown>)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to save support contacts')
     } finally {
@@ -3039,6 +3039,7 @@ function ConfigTab() {
                     onClick={() => {
                       const updated = supportContacts.filter((_, idx) => idx !== i)
                       setSupportContacts(updated)
+                      saveSupportContacts(updated)
                     }}
                     style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: 4 }}
                     title="Remove contact"
@@ -3072,7 +3073,9 @@ function ConfigTab() {
                 <button
                   onClick={() => {
                     if (!newContact.name.trim() || !newContact.user_id.trim()) return
-                    setSupportContacts([...supportContacts, { ...newContact }])
+                    const updated = [...supportContacts, { ...newContact }]
+                    setSupportContacts(updated)
+                    saveSupportContacts(updated)
                     setShowAddContact(false)
                   }}
                   disabled={!newContact.name.trim() || !newContact.user_id.trim()}
@@ -3093,19 +3096,6 @@ function ConfigTab() {
               </div>
             </div>
           )}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 16 }}>
-            <button
-              onClick={handleSaveSupportContacts}
-              disabled={supportSaving}
-              style={{
-                padding: '8px 20px', borderRadius: 'var(--ui-radius, 12px)', border: 'none',
-                background: '#111827', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer',
-                opacity: supportSaving ? 0.6 : 1,
-              }}
-            >
-              {supportSaving ? 'Saving...' : 'Save Support Contacts'}
-            </button>
-          </div>
         </div>
       </div>
 
