@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react'
+import { Link } from '@tanstack/react-router'
 import { useAuth } from '../../hooks/useAuth'
 
 export function LoginForm() {
@@ -51,6 +52,11 @@ export function LoginForm() {
       >
         {loading ? 'Signing in...' : 'SIGN IN'}
       </button>
+      <p className="text-center text-sm">
+        <Link to="/reset-password" className="text-gray-400 hover:text-[#f1b300] transition-colors">
+          Forgot password?
+        </Link>
+      </p>
     </form>
   )
 }

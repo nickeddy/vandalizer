@@ -35,6 +35,34 @@ class RegisterRequest(BaseModel):
         return v
 
 
+class ForgotPasswordRequest(BaseModel):
+    email: str
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    password: str
+
+    @field_validator("password")
+    @classmethod
+    def validate_password_complexity(cls, v: str) -> str:
+        errors: list[str] = []
+        if len(v) < 8:
+            errors.append("at least 8 characters")
+        if not re.search(r"[A-Z]", v):
+            errors.append("at least one uppercase letter")
+        if not re.search(r"[a-z]", v):
+            errors.append("at least one lowercase letter")
+        if not re.search(r"\d", v):
+            errors.append("at least one digit")
+        if errors:
+            raise ValueError(
+                "Password does not meet complexity requirements. "
+                "Must contain: " + "; ".join(errors) + "."
+            )
+        return v
+
+
 class UpdateProfileRequest(BaseModel):
     name: Optional[str] = None
     email: Optional[str] = None

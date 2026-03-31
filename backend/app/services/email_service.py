@@ -127,6 +127,28 @@ def trial_expired_email(name: str, feedback_url: str) -> tuple[str, str]:
 
 
 # ---------------------------------------------------------------------------
+# Password reset email
+# ---------------------------------------------------------------------------
+
+
+def password_reset_email(
+    name: str, reset_url: str,
+) -> tuple[str, str]:
+    """Returns (subject, html_body) for a password reset request."""
+    subject = "Reset your Vandalizer password"
+    html = f"""<!DOCTYPE html><html><head>{_BASE_STYLE}</head><body>
+    <div class="container"><div class="card">
+      <div class="logo">Vandalizer</div>
+      <h1>Password Reset</h1>
+      <p>Hi {name}, we received a request to reset your password. Click the button below to choose a new one.</p>
+      <p style="margin-top:24px"><a class="btn" href="{reset_url}">Reset Password</a></p>
+      <p style="font-size:13px;color:#6b7280;margin-top:16px">This link expires in 1 hour. If you didn't request this, you can safely ignore this email.</p>
+      <div class="footer">Vandalizer</div>
+    </div></div></body></html>"""
+    return subject, html
+
+
+# ---------------------------------------------------------------------------
 # Team invitation emails
 # ---------------------------------------------------------------------------
 

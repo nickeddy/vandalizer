@@ -43,6 +43,20 @@ export function register(user_id: string, email: string, password: string, name?
   })
 }
 
+export function forgotPassword(email: string) {
+  return apiFetch<{ ok: boolean }>('/api/auth/forgot-password', {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  })
+}
+
+export function resetPassword(token: string, password: string) {
+  return apiFetch<{ ok: boolean }>('/api/auth/reset-password', {
+    method: 'POST',
+    body: JSON.stringify({ token, password }),
+  })
+}
+
 export function logout() {
   return apiFetch<{ ok: boolean }>('/api/auth/logout', { method: 'POST' })
 }

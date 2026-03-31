@@ -14,7 +14,7 @@ from app.rate_limit import limiter
 from app.models.system_config import SystemConfig
 from app.utils.encryption import decrypt_value
 from app.models.user import User
-from app.schemas.auth import DeleteAccountRequest, LoginRequest, RegisterRequest, UpdateProfileRequest, UserResponse
+from app.schemas.auth import DeleteAccountRequest, ForgotPasswordRequest, LoginRequest, RegisterRequest, ResetPasswordRequest, UpdateProfileRequest, UserResponse
 from app.services import auth_service, audit_service
 from app.utils.security import (
     create_access_token,
@@ -144,6 +144,76 @@ async def register(
         )
     _set_tokens(response, user, settings)
     return await _user_response(user)
+
+
+@router.post("/forgot-password")
+@limiter.limit("3/minute")
+async def forgot_password(
+    request: Request,
+    body: ForgotPasswordRequest,
+    settings: Settings = Depends(get_settings),
+):
+    """Send a password reset email. Always returns success to avoid email enumeration."""
+    email = body.email.strip().lower()
+    user = await User.find_one(User.email == email)
+    if not user:
+        user = await User.find_one(User.user_id == email)
+    if not user or not user.password_hash:
+        # Don't reveal whether the email exists
+        return {"ok": True}
+
+    # Generate token, store in Redis with 1-hour TTL
+    token = secrets.token_urlsafe(32)
+    r = aioredis.from_url(f"redis://{settings.redis_host}:6379")
+    try:
+        await r.set(f"pw_reset:{token}", user.user_id, ex=3600)
+    finally:
+        await r.aclose()
+
+    from app.services.email_service import send_email, password_reset_email
+
+    reset_url = f"{settings.frontend_url}/reset-password?token={token}"
+    subject, html = password_reset_email(user.name or user.user_id, reset_url)
+    await send_email(user.email or email, subject, html, settings)
+
+    return {"ok": True}
+
+
+@router.post("/reset-password")
+@limiter.limit("5/minute")
+async def reset_password(
+    request: Request,
+    body: ResetPasswordRequest,
+    settings: Settings = Depends(get_settings),
+):
+    """Reset password using a token from the forgot-password email."""
+    from app.utils.security import hash_password
+
+    r = aioredis.from_url(f"redis://{settings.redis_host}:6379")
+    try:
+        user_id = await r.get(f"pw_reset:{body.token}")
+        if not user_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid or expired reset link. Please request a new one.",
+            )
+        # Consume the token (one-time use)
+        await r.delete(f"pw_reset:{body.token}")
+    finally:
+        await r.aclose()
+
+    user_id_str = user_id.decode() if isinstance(user_id, bytes) else user_id
+    user = await User.find_one(User.user_id == user_id_str)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="User not found.",
+        )
+
+    user.password_hash = hash_password(body.password)
+    await user.save()
+
+    return {"ok": True}
 
 
 @router.post("/logout")
