@@ -757,6 +757,12 @@ def process_outputs(self, workflow_result_id: str) -> dict:
             {"$set": {"status": new_status, "updated_at": datetime.now(timezone.utc)}},
         )
 
+    # 8. Clean up temporary API text-input documents
+    if trigger_event:
+        temp_uuids = (trigger_event.get("trigger_context") or {}).get("temp_doc_uuids", [])
+        if temp_uuids:
+            db.smart_document.delete_many({"uuid": {"$in": temp_uuids}})
+
     return outputs
 
 
@@ -964,9 +970,16 @@ def process_extraction_outputs(
             }},
         )
 
-        # Deliver per-request callback if configured
+        # Deliver per-request callback and clean up temp docs
         ext_event = db.extraction_trigger_event.find_one({"_id": ObjectId(extraction_event_id)})
-        cb_url = (ext_event.get("trigger_context") or {}).get("callback_url") if ext_event else None
+        trigger_ctx = (ext_event.get("trigger_context") or {}) if ext_event else {}
+
+        # Clean up temporary API text-input documents
+        temp_uuids = trigger_ctx.get("temp_doc_uuids", [])
+        if temp_uuids:
+            db.smart_document.delete_many({"uuid": {"$in": temp_uuids}})
+
+        cb_url = trigger_ctx.get("callback_url")
         if cb_url:
             deliver_callback.delay(
                 trigger_event_id=extraction_event_id,

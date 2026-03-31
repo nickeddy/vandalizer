@@ -33,7 +33,7 @@ export function Login() {
   }
 
   if (!passwordAllowed) {
-    return <Navigate to="/landing" />
+    return <Navigate to="/landing" search={{ error: undefined, invite_token: undefined }} />
   }
 
   return (
