@@ -209,7 +209,23 @@ async def provision_module_documents(user, module_id: str, settings) -> dict:
             settings=settings,
             folder=folder.uuid,
         )
-        provisioned.append(result["uuid"])
+        doc_uuid = result["uuid"]
+        provisioned.append(doc_uuid)
+
+        # Extract text directly with PyPDF2 and patch the document.
+        # These are synthetic PDFs we control — no need for OCR or
+        # the async Celery pipeline, which can produce partial text.
+        from app.services.document_readers import extract_text_from_pdf
+
+        raw_text = extract_text_from_pdf(str(filepath))
+        if raw_text:
+            doc = await SmartDocument.find_one(SmartDocument.uuid == doc_uuid)
+            if doc:
+                doc.raw_text = raw_text
+                doc.processing = False
+                doc.task_status = "complete"
+                doc.token_count = len(raw_text) // 4
+                await doc.save()
 
     # Store provisioning info in progress
     prog = await get_progress(user_id)
