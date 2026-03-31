@@ -24,6 +24,7 @@ const Demo = lazy(() => import('./pages/Demo'))
 const DemoFeedback = lazy(() => import('./pages/DemoFeedback'))
 const InviteAccept = lazy(() => import('./pages/InviteAccept'))
 const Organizations = lazy(() => import('./pages/Organizations'))
+const Login = lazy(() => import('./pages/Login'))
 
 // Certification is now a dockable panel — this redirect opens it from old bookmarks
 function CertificationRedirect() {
@@ -64,6 +65,7 @@ const landingRoute = createRoute({
   validateSearch: (search: Record<string, unknown>) => ({
     error: (search.error as string) || undefined,
     invite_token: (search.invite_token as string) || undefined,
+    admin: (search.admin as string) || undefined,
   }),
   component: Landing,
 })
@@ -71,7 +73,11 @@ const landingRoute = createRoute({
 const loginRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/login',
-  component: () => <Navigate to="/landing" search={{ error: undefined, invite_token: undefined }} />,
+  component: () => (
+    <Suspense fallback={null}>
+      <Login />
+    </Suspense>
+  ),
 })
 
 const registerRoute = createRoute({

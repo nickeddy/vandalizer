@@ -243,11 +243,6 @@ function AuthBlock({ config }: { config: AuthConfig | null }) {
         </>
       )}
 
-      {!oauthEnabled && !passwordEnabled && (
-        <p className="text-sm text-gray-400">
-          No authentication methods are enabled. Please contact an administrator.
-        </p>
-      )}
     </div>
   )
 }

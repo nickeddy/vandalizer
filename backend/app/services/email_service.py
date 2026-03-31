@@ -89,7 +89,7 @@ def activation_email(name: str, user_id: str, password: str, expires_at: str, fr
       <p><strong style="color:#fff">Username:</strong> {user_id}<br/>
          <strong style="color:#fff">Password:</strong> {password}</p>
       <p>Your trial expires on <span class="highlight">{expires_at}</span>.</p>
-      <p style="margin-top:24px"><a class="btn" href="{frontend_url}/landing">Sign In Now</a></p>
+      <p style="margin-top:24px"><a class="btn" href="{frontend_url}/login">Sign In Now</a></p>
       <div class="footer">Vandalizer</div>
     </div></div></body></html>"""
     return subject, html
