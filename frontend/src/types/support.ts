@@ -26,6 +26,7 @@ export interface SupportTicket {
   user_email: string | null
   team_id: string | null
   assigned_to: string | null
+  category: string | null
   messages: SupportMessage[]
   attachments: SupportAttachment[]
   message_count: number
@@ -42,6 +43,7 @@ export interface SupportTicketSummary {
   user_id: string
   user_name: string | null
   assigned_to: string | null
+  category: string | null
   message_count: number
   last_message_preview: string | null
   last_message_at: string | null

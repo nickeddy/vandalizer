@@ -58,6 +58,7 @@ def _ticket_to_dict(t: SupportTicket) -> dict:
         "created_at": t.created_at.isoformat() if t.created_at else None,
         "updated_at": t.updated_at.isoformat() if t.updated_at else None,
         "closed_at": t.closed_at.isoformat() if t.closed_at else None,
+        "category": t.category,
     }
 
 
@@ -86,6 +87,7 @@ def _ticket_summary(t: SupportTicket) -> dict:
             last_message.user_id if last_message else None
         ),
         "read_by": t.read_by,
+        "category": t.category,
         "created_at": t.created_at.isoformat() if t.created_at else None,
         "updated_at": t.updated_at.isoformat() if t.updated_at else None,
         "closed_at": t.closed_at.isoformat() if t.closed_at else None,
@@ -209,6 +211,12 @@ async def add_message(
         ticket.status = TicketStatus.OPEN
 
     await ticket.save()
+
+    # If the user (not support) replied to a feedback prompt ticket,
+    # mark the corresponding prompt as responded.
+    if not is_support_reply and ticket.category == "feedback_prompt":
+        from app.services.feedback_prompt_service import mark_responded
+        await mark_responded(ticket.uuid)
 
     # Notify the other party
     if is_support_reply:

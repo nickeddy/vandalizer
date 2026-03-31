@@ -65,6 +65,9 @@ class SupportTicket(Document):
     messages: list[SupportMessage] = []
     attachments: list[SupportAttachment] = []
 
+    # Category (None for regular tickets, "feedback_prompt" for check-in prompts)
+    category: Optional[str] = None
+
     # Assignment
     assigned_to: Optional[str] = None  # user_id of support person
 

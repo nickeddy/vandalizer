@@ -112,6 +112,11 @@ function TicketListView({
                   <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${STATUS_DOT[t.status]}`} />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5">
+                      {t.category === 'feedback_prompt' && (
+                        <span className="shrink-0 rounded bg-amber-100 px-1 py-0.5 text-[9px] font-bold uppercase text-amber-700">
+                          Check-in
+                        </span>
+                      )}
                       <p className={`truncate text-sm ${attention ? 'font-semibold text-gray-900' : 'font-medium text-gray-900'}`}>
                         {t.subject}
                       </p>
@@ -305,11 +310,13 @@ function ChatView({
   isSupportAgent,
   onBack,
   onTicketUpdated,
+  onDismissPrompt,
 }: {
   ticketUuid: string
   isSupportAgent: boolean
   onBack: () => void
   onTicketUpdated: () => void
+  onDismissPrompt?: () => void
 }) {
   const { user } = useAuth()
   const { toast } = useToast()
@@ -556,6 +563,21 @@ function ChatView({
         </div>
       )}
 
+      {/* Dismiss option for unanswered feedback prompt tickets */}
+      {onDismissPrompt && ticket.category === 'feedback_prompt' && ticket.messages.length <= 1 && (
+        <div className="border-t px-3 py-1.5 text-center">
+          <button
+            onClick={() => {
+              onDismissPrompt()
+              onBack()
+            }}
+            className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
+          >
+            Not now
+          </button>
+        </div>
+      )}
+
       {/* Input */}
       <div className="border-t px-3 py-2">
         <div className="flex items-end gap-1.5">
@@ -596,10 +618,12 @@ export function SupportChatPanel({
   open,
   onClose,
   initialTicket,
+  onDismissPrompt,
 }: {
   open: boolean
   onClose: () => void
   initialTicket?: string
+  onDismissPrompt?: () => void
 }) {
   const { user } = useAuth()
   const isSupportAgent = user?.is_support_agent ?? false
@@ -722,6 +746,7 @@ export function SupportChatPanel({
             loadTickets()
           }}
           onTicketUpdated={loadTickets}
+          onDismissPrompt={onDismissPrompt}
         />
       )}
     </div>,

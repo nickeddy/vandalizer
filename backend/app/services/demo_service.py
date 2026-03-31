@@ -148,8 +148,17 @@ async def _activate_application(app: DemoApplication, settings: Settings) -> Non
     )
     await user.insert()
 
-    # Find or create org team
-    team = await _find_or_create_org_team(app.organization, user.user_id)
+    # Find or create team from org + department
+    department = None
+    responses = app.questionnaire_responses or {}
+    ra_dept = responses.get("ra_department")
+    if isinstance(ra_dept, list) and ra_dept:
+        # Use the first selected department, skip generic answers
+        for d in ra_dept:
+            if d not in ("Other", "I'm not in research administration"):
+                department = d
+                break
+    team = await _find_or_create_org_team(app.organization, user.user_id, department)
 
     # Add membership
     existing_membership = await TeamMembership.find_one(
@@ -184,9 +193,11 @@ async def _activate_application(app: DemoApplication, settings: Settings) -> Non
     await send_email(app.email, subject, html, settings)
 
 
-async def _find_or_create_org_team(org_name: str, owner_user_id: str) -> Team:
-    """Find existing Demo team for org or create a new one."""
-    team_name = f"Demo - {org_name}"
+async def _find_or_create_org_team(
+    org_name: str, owner_user_id: str, department: str | None = None
+) -> Team:
+    """Find existing team for org+department or create a new one."""
+    team_name = f"{org_name} - {department}" if department else org_name
     team = await Team.find_one(Team.name == team_name)
     if team:
         return team

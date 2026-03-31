@@ -1,8 +1,11 @@
 import base64
+import logging
 import tempfile
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 from app.config import Settings
 from app.models.document import SmartDocument
@@ -186,11 +189,18 @@ async def delete_document(
     doc = await access_control.get_authorized_document(doc_uuid, user, manage=True)
     if not doc:
         return False
-    from app.services.storage import get_storage
 
-    storage = get_storage(settings)
+    # Delete the stored file (best-effort — don't block DB cleanup)
     relative_path = doc.downloadpath or doc.path
-    await storage.delete(relative_path)
+    if relative_path:
+        from app.services.storage import get_storage
+
+        storage = get_storage(settings)
+        try:
+            await storage.delete(relative_path)
+        except Exception:
+            logger.warning("Failed to delete file for document %s: %s", doc_uuid, relative_path)
+
     await doc.delete()
     return True
 

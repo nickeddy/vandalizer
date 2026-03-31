@@ -6,6 +6,7 @@ export interface User {
   is_admin: boolean
   is_examiner: boolean
   is_support_agent: boolean
+  is_demo_user: boolean
   current_team: string | null
   current_team_uuid: string | null
 }

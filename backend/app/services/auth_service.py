@@ -45,8 +45,9 @@ async def authenticate(user_id: str, password: str) -> User | None:
         return None
     if not verify_password(password, user.password_hash):
         return None
-    # Silently backfill default-team membership for pre-existing users
-    await _auto_join_default_team(user, set_current=False)
+    # Silently backfill default-team membership for non-demo users
+    if not user.is_demo_user:
+        await _auto_join_default_team(user, set_current=False)
     from app.services.team_service import ensure_current_team
     await ensure_current_team(user)
     return user

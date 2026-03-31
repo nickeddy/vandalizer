@@ -15,11 +15,13 @@ export function LessonStepper({
   moduleId,
   onAllLessonsRead,
   onGoToChallenge,
+  onStepChange,
 }: {
   lessons: LessonSection[]
   moduleId: string
   onAllLessonsRead?: () => void
   onGoToChallenge: () => void
+  onStepChange?: () => void
 }) {
   // Resume from localStorage
   const storageKey = `cert-lesson-${moduleId}`
@@ -63,14 +65,16 @@ export function LessonStepper({
       setCurrentIndex(nextIdx)
       setReadLessons(prev => new Set([...prev, nextIdx]))
       toast(`Lesson ${safeIndex + 1} of ${lessons.length} complete!`, 'success')
+      onStepChange?.()
     }
-  }, [safeIndex, lessons.length, toast])
+  }, [safeIndex, lessons.length, toast, onStepChange])
 
   const goPrev = useCallback(() => {
     if (safeIndex > 0) {
       setCurrentIndex(safeIndex - 1)
+      onStepChange?.()
     }
-  }, [safeIndex])
+  }, [safeIndex, onStepChange])
 
   // Notify when all lessons read
   useEffect(() => {
@@ -89,7 +93,7 @@ export function LessonStepper({
         {lessons.map((_, i) => (
           <button
             key={i}
-            onClick={() => setCurrentIndex(i)}
+            onClick={() => { setCurrentIndex(i); onStepChange?.() }}
             className={cn(
               'h-2 flex-1 transition-all duration-300',
               i === safeIndex

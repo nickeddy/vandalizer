@@ -38,6 +38,7 @@ from app.models.audit_log import AuditLog, AdminAuditLog
 from app.models.approval import ApprovalRequest
 from app.models.notification import Notification
 from app.models.support import SupportTicket
+from app.models.feedback_prompt import FeedbackPrompt, FeedbackPromptResponse
 
 ALL_MODELS = [
     User,
@@ -93,6 +94,8 @@ ALL_MODELS = [
     ApprovalRequest,
     Notification,
     SupportTicket,
+    FeedbackPrompt,
+    FeedbackPromptResponse,
 ]
 
 

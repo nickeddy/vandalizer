@@ -34,6 +34,7 @@ import {
   getDemoStats, getDemoApplications, releaseDemoUser, activateDemoUser,
   getPostExperienceResponses,
 } from '../api/demo'
+import { getAdminPromptOverview, adminUpdatePrompt, type PromptOverview } from '../api/feedbackPrompt'
 import type { DemoAdminStats, DemoApplication as DemoApp, PostExperienceResponseAdmin } from '../types/demo'
 import { POST_SURVEY_FIELDS } from '../components/survey/postSurveyFields'
 import { SurveyFieldRenderer } from '../components/survey/SurveyFieldRenderer'
@@ -3391,6 +3392,133 @@ function DemoTab() {
                   </td>
                 </tr>
               )}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Trial Check-ins */}
+      <TrialCheckinsSection />
+    </div>
+  )
+}
+
+function TrialCheckinsSection() {
+  const [prompts, setPrompts] = useState<PromptOverview[]>([])
+  const [loading, setLoading] = useState(true)
+
+  const loadPrompts = useCallback(async () => {
+    setLoading(true)
+    try {
+      const data = await getAdminPromptOverview()
+      setPrompts(data)
+    } catch {
+      // ignore
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { loadPrompts() }, [loadPrompts])
+
+  async function toggleEnabled(slug: string, enabled: boolean) {
+    await adminUpdatePrompt(slug, { enabled })
+    loadPrompts()
+  }
+
+  const stageColors: Record<string, { bg: string; text: string }> = {
+    early: { bg: '#dbeafe', text: '#1e40af' },
+    mid: { bg: '#fef3c7', text: '#92400e' },
+    late: { bg: '#fee2e2', text: '#991b1b' },
+  }
+
+  return (
+    <div style={{ marginTop: 32 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+        <h3 style={{ fontSize: 17, fontWeight: 700, margin: 0 }}>Trial Check-ins</h3>
+        <button
+          onClick={loadPrompts}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 6,
+            padding: '6px 12px', border: '1px solid #e5e7eb', borderRadius: 8,
+            background: '#fff', cursor: 'pointer', fontSize: 12, fontFamily: 'inherit',
+          }}
+        >
+          <RefreshCw size={12} /> Refresh
+        </button>
+      </div>
+      <p style={{ fontSize: 13, color: '#6b7280', marginBottom: 16 }}>
+        Proactive check-in prompts delivered through the support panel during the trial.
+        Responses appear as support tickets.
+      </p>
+
+      {loading ? (
+        <div style={{ padding: 24, textAlign: 'center', color: '#9ca3af' }}>Loading...</div>
+      ) : prompts.length === 0 ? (
+        <div style={{ padding: 24, textAlign: 'center', color: '#9ca3af' }}>
+          No prompts configured. They will be seeded on next server restart.
+        </div>
+      ) : (
+        <div style={{ overflowX: 'auto', borderRadius: 12, border: '1px solid #e5e7eb' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+            <thead>
+              <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
+                <th style={{ padding: '10px 16px', textAlign: 'left', fontWeight: 600 }}>Stage</th>
+                <th style={{ padding: '10px 16px', textAlign: 'left', fontWeight: 600 }}>Subject</th>
+                <th style={{ padding: '10px 16px', textAlign: 'left', fontWeight: 600, maxWidth: 300 }}>Question</th>
+                <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 600 }}>Shown</th>
+                <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 600 }}>Responded</th>
+                <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 600 }}>Dismissed</th>
+                <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 600 }}>Rate</th>
+                <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 600 }}>Enabled</th>
+              </tr>
+            </thead>
+            <tbody>
+              {prompts.map((p) => {
+                const sc = stageColors[p.stage] || { bg: '#f3f4f6', text: '#374151' }
+                return (
+                  <tr key={p.slug} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                    <td style={{ padding: '10px 16px' }}>
+                      <span style={{
+                        padding: '2px 8px', borderRadius: 99, fontSize: 11, fontWeight: 600,
+                        background: sc.bg, color: sc.text,
+                      }}>
+                        {p.stage}
+                      </span>
+                    </td>
+                    <td style={{ padding: '10px 16px', fontWeight: 500 }}>{p.subject}</td>
+                    <td style={{ padding: '10px 16px', maxWidth: 300, color: '#6b7280' }}>
+                      <span title={p.question_text}>
+                        {p.question_text.length > 80 ? p.question_text.slice(0, 80) + '...' : p.question_text}
+                      </span>
+                    </td>
+                    <td style={{ padding: '10px 12px', textAlign: 'center' }}>{p.stats.shown}</td>
+                    <td style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 600, color: '#16a34a' }}>
+                      {p.stats.responded}
+                    </td>
+                    <td style={{ padding: '10px 12px', textAlign: 'center', color: '#9ca3af' }}>{p.stats.dismissed}</td>
+                    <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                      {p.stats.shown > 0 ? `${Math.round(p.stats.response_rate * 100)}%` : '-'}
+                    </td>
+                    <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                      <button
+                        onClick={() => toggleEnabled(p.slug, !p.enabled)}
+                        style={{
+                          width: 36, height: 20, borderRadius: 10, border: 'none',
+                          background: p.enabled ? '#16a34a' : '#d1d5db',
+                          cursor: 'pointer', position: 'relative', transition: 'background 0.2s',
+                        }}
+                      >
+                        <span style={{
+                          position: 'absolute', top: 2, left: p.enabled ? 18 : 2,
+                          width: 16, height: 16, borderRadius: '50%', background: '#fff',
+                          transition: 'left 0.2s', boxShadow: '0 1px 2px rgba(0,0,0,0.2)',
+                        }} />
+                      </button>
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>

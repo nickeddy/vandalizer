@@ -77,6 +77,7 @@ async def _user_response(user: User) -> UserResponse:
         is_admin=user.is_admin,
         is_examiner=user.is_examiner,
         is_support_agent=is_support_agent,
+        is_demo_user=user.is_demo_user,
         current_team=str(user.current_team) if user.current_team else None,
         current_team_uuid=current_team_uuid,
     )

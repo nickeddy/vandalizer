@@ -14,7 +14,7 @@ from app.database import init_db
 from app.exceptions import AppError
 from app.middleware.csrf import CSRFMiddleware
 from app.rate_limit import limiter
-from app.routers import activity, admin, approvals, audit, auth, automations, browser_automation, certification, chat, config, demo, documents, extractions, feedback, files, folders, graph_webhooks, knowledge, library, notifications, office, organizations, spaces, support, teams, verification, workflows
+from app.routers import activity, admin, approvals, audit, auth, automations, browser_automation, certification, chat, config, demo, documents, extractions, feedback, feedback_prompt, files, folders, graph_webhooks, knowledge, library, notifications, office, organizations, spaces, support, teams, verification, workflows
 
 
 @lru_cache
@@ -72,6 +72,11 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     logger.info("Starting Vandalizer backend")
     await init_db(get_settings())
+
+    # Seed default feedback prompts for trial check-ins
+    from app.services.feedback_prompt_service import seed_default_prompts
+    await seed_default_prompts()
+
     yield
     logger.info("Shutting down Vandalizer backend")
 
@@ -196,6 +201,7 @@ app.include_router(approvals.router, prefix="/api/approvals", tags=["approvals"]
 app.include_router(notifications.router, prefix="/api/notifications", tags=["notifications"])
 app.include_router(spaces.router, prefix="/api/spaces", tags=["spaces"])
 app.include_router(support.router, prefix="/api/support", tags=["support"])
+app.include_router(feedback_prompt.router, prefix="/api/feedback/prompts", tags=["feedback-prompts"])
 
 
 # ---------------------------------------------------------------------------

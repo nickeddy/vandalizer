@@ -53,5 +53,6 @@ class UserResponse(BaseModel):
     is_admin: bool = False
     is_examiner: bool = False
     is_support_agent: bool = False
+    is_demo_user: bool = False
     current_team: Optional[str] = None
     current_team_uuid: Optional[str] = None

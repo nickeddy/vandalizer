@@ -172,6 +172,7 @@ export function ModuleDetail({ module, moduleProgress, onValidate, onComplete, o
               moduleId={module.id}
               onAllLessonsRead={handleAllLessonsRead}
               onGoToChallenge={() => setTab('challenge')}
+              onStepChange={onTabChange}
             />
           </div>
         ) : (
