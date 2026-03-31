@@ -380,6 +380,21 @@ async def run_extraction_sync(
     if not keys:
         return []
 
+    # Wait for any documents still being processed (e.g. file uploads where
+    # text extraction hasn't finished yet) before reading their text.
+    import asyncio as _asyncio
+    _PROCESSING_POLL_INTERVAL = 3  # seconds
+    _PROCESSING_TIMEOUT = 90  # seconds
+    _waited = 0
+    while _waited < _PROCESSING_TIMEOUT:
+        still_processing = await SmartDocument.find(
+            {"uuid": {"$in": document_uuids}, "processing": True},
+        ).count()
+        if still_processing == 0:
+            break
+        await _asyncio.sleep(_PROCESSING_POLL_INTERVAL)
+        _waited += _PROCESSING_POLL_INTERVAL
+
     # Pre-load document texts and file paths
     import os
     from app.config import Settings

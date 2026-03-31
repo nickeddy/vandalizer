@@ -404,6 +404,7 @@ async def trigger_automation(
     team_id = str(user.current_team) if user.current_team else None
     existing_doc_uuids: list[str] = []
     all_doc_uuids: list[str] = []
+    temp_doc_uuids: list[str] = []  # Track temporary docs for cleanup after processing
 
     try:
         # Parse existing document UUIDs
@@ -430,6 +431,7 @@ async def trigger_automation(
             )
             await doc.insert()
             all_doc_uuids.append(uid)
+            temp_doc_uuids.append(uid)
 
         # Handle file uploads
         for upload in files:
@@ -477,7 +479,7 @@ async def trigger_automation(
 
     # Route to the appropriate action
     try:
-        return await _dispatch_action(auto, user, all_doc_uuids, callback_url, wait, timeout)
+        return await _dispatch_action(auto, user, all_doc_uuids, callback_url, wait, timeout, temp_doc_uuids)
     except HTTPException:
         raise
     except Exception as e:
@@ -485,7 +487,7 @@ async def trigger_automation(
         raise HTTPException(status_code=500, detail=f"Error dispatching action: {e}")
 
 
-async def _dispatch_action(auto, user, all_doc_uuids, callback_url, wait, timeout):
+async def _dispatch_action(auto, user, all_doc_uuids, callback_url, wait, timeout, temp_doc_uuids=None):
     from app.models.activity import ActivityType
     from app.services import activity_service
     if auto.action_type in ("workflow", "task"):
@@ -509,6 +511,7 @@ async def _dispatch_action(auto, user, all_doc_uuids, callback_url, wait, timeou
             workflow_id=auto.action_id,
             document_oids=doc_oids,
             callback_url=callback_url,
+            temp_doc_uuids=temp_doc_uuids or [],
         )
 
         # Also create an Activity for the UI activity feed
@@ -564,13 +567,18 @@ async def _dispatch_action(auto, user, all_doc_uuids, callback_url, wait, timeou
             raise HTTPException(status_code=404, detail="Linked extraction not found")
 
         # Create tracking event for extractions
+        trigger_ctx: dict = {}
+        if callback_url:
+            trigger_ctx["callback_url"] = callback_url
+        if temp_doc_uuids:
+            trigger_ctx["temp_doc_uuids"] = temp_doc_uuids
         ext_event = ExtractionTriggerEvent(
             automation_id=str(auto.id),
             search_set_uuid=auto.action_id,
             user_id=user.user_id,
             status="queued",
             document_uuids=all_doc_uuids,
-            trigger_context={"callback_url": callback_url} if callback_url else {},
+            trigger_context=trigger_ctx,
         )
         await ext_event.insert()
 

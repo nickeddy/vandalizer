@@ -317,29 +317,33 @@ def _send_email(recipients: list[str], subject: str, html_body: str) -> None:
     from email.mime.multipart import MIMEMultipart
     from email.mime.text import MIMEText
 
-    smtp_host = os.environ.get("SMTP_HOST", "")
-    smtp_port = int(os.environ.get("SMTP_PORT", "587"))
-    smtp_user = os.environ.get("SMTP_USER", "")
-    smtp_password = os.environ.get("SMTP_PASSWORD", "")
-    from_email = os.environ.get("SMTP_FROM_EMAIL", "noreply@vandalizer.com")
+    from app.config import Settings
 
-    if not smtp_host:
+    settings = Settings()
+    if not settings.smtp_host:
         logger.warning("SMTP not configured, skipping email notification")
         return
 
+    from_addr = settings.smtp_from_email or "noreply@vandalizer.com"
+    from_header = f"{settings.smtp_from_name} <{from_addr}>" if settings.smtp_from_name else from_addr
+
     msg = MIMEMultipart("alternative")
     msg["Subject"] = subject
-    msg["From"] = from_email
+    msg["From"] = from_header
     msg["To"] = ", ".join(recipients)
     msg.attach(MIMEText(html_body, "html"))
 
     try:
-        with smtplib.SMTP(smtp_host, smtp_port) as server:
-            if os.environ.get("SMTP_USE_TLS", "true").lower() == "true":
+        if settings.smtp_use_tls:
+            server = smtplib.SMTP_SSL(settings.smtp_host, settings.smtp_port)
+        else:
+            server = smtplib.SMTP(settings.smtp_host, settings.smtp_port)
+            if settings.smtp_start_tls:
                 server.starttls()
-            if smtp_user:
-                server.login(smtp_user, smtp_password)
-            server.sendmail(from_email, recipients, msg.as_string())
+        with server:
+            if settings.smtp_user:
+                server.login(settings.smtp_user, settings.smtp_password)
+            server.sendmail(from_addr, recipients, msg.as_string())
     except Exception as e:
         logger.error("Failed to send email: %s", e)
 

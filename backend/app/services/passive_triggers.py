@@ -103,6 +103,7 @@ def create_api_trigger(
     workflow_id: str,
     document_oids: list,
     callback_url: str | None = None,
+    temp_doc_uuids: list[str] | None = None,
 ) -> dict:
     """Create a trigger event for an API-initiated automation.
 
@@ -118,6 +119,8 @@ def create_api_trigger(
     }
     if callback_url:
         trigger_context["callback_url"] = callback_url
+    if temp_doc_uuids:
+        trigger_context["temp_doc_uuids"] = temp_doc_uuids
 
     event = {
         **_base_event(now),

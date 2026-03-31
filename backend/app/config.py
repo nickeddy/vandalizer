@@ -33,7 +33,8 @@ class Settings(BaseSettings):
     smtp_port: int = 587
     smtp_user: str = ""
     smtp_password: str = ""
-    smtp_use_tls: bool = True
+    smtp_use_tls: bool = False  # Implicit TLS (port 465)
+    smtp_start_tls: bool = True  # STARTTLS upgrade (port 587)
     smtp_from_email: str = ""
     smtp_from_name: str = "Vandalizer"
 

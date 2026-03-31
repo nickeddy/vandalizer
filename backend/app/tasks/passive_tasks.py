@@ -845,10 +845,32 @@ def process_extraction_outputs(
             for item in ss_items
         ]
 
+        # Wait for any documents still being processed (e.g. file uploads
+        # where text extraction hasn't finished yet) before running the
+        # LLM extraction.  Poll with back-off up to ~90 seconds.
+        import time
+        _PROCESSING_POLL_INTERVAL = 3  # seconds
+        _PROCESSING_TIMEOUT = 90  # seconds
+        _waited = 0
+        while _waited < _PROCESSING_TIMEOUT:
+            still_processing = db.smart_document.count_documents({
+                "uuid": {"$in": document_uuids},
+                "processing": True,
+            })
+            if still_processing == 0:
+                break
+            logger.info(
+                "Waiting for %d document(s) to finish processing (%ds elapsed)",
+                still_processing, _waited,
+            )
+            time.sleep(_PROCESSING_POLL_INTERVAL)
+            _waited += _PROCESSING_POLL_INTERVAL
+
         results = {}
         for doc_uuid in document_uuids:
             doc = db.smart_document.find_one({"uuid": doc_uuid})
             if not doc or not doc.get("raw_text"):
+                logger.warning("Skipping doc %s: no raw_text available", doc_uuid)
                 continue
             try:
                 engine = ExtractionEngine(system_config_doc=sys_config, domain=domain)

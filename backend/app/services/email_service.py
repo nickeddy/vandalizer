@@ -34,6 +34,7 @@ async def send_email(to: str, subject: str, html_body: str, settings: Settings |
             username=settings.smtp_user or None,
             password=settings.smtp_password or None,
             use_tls=settings.smtp_use_tls,
+            start_tls=settings.smtp_start_tls,
         )
         logger.info("Email sent to %s: %s", to, subject)
         return True

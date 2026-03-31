@@ -162,6 +162,7 @@ function AuthBlock({ config }: { config: AuthConfig | null }) {
   const [mode, setMode] = useState<'login' | 'register'>('login')
   const search = useSearch({ strict: false }) as Record<string, string | undefined>
   const oauthError = search?.error
+  const adminOverride = search?.admin === '1'
 
   if (!config) {
     return (
@@ -172,7 +173,7 @@ function AuthBlock({ config }: { config: AuthConfig | null }) {
   }
 
   const oauthEnabled = config.auth_methods.includes('oauth')
-  const passwordEnabled = config.auth_methods.includes('password')
+  const passwordEnabled = config.auth_methods.includes('password') || adminOverride
   const azureProvider = config.oauth_providers.find(
     (p) => p.provider === 'azure' && p.configured,
   )

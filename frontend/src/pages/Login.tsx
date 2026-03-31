@@ -1,12 +1,21 @@
-import { Navigate, Link } from '@tanstack/react-router'
+import { useState, useEffect } from 'react'
+import { Navigate, Link, useSearch } from '@tanstack/react-router'
 import { useAuth } from '../hooks/useAuth'
 import { AuthLayout } from '../components/layout/AuthLayout'
 import { LoginForm } from '../components/auth/LoginForm'
+import { getAuthConfig } from '../api/auth'
 
 export function Login() {
   const { user, loading } = useAuth()
+  const search = useSearch({ strict: false }) as Record<string, string | undefined>
+  const adminOverride = search?.admin === '1'
+  const [passwordAllowed, setPasswordAllowed] = useState<boolean | null>(null)
 
-  if (loading) return null
+  useEffect(() => {
+    getAuthConfig().then(c => setPasswordAllowed(c.auth_methods.includes('password') || adminOverride))
+  }, [adminOverride])
+
+  if (loading || passwordAllowed === null) return null
   if (user) {
     return (
       <Navigate
@@ -21,6 +30,10 @@ export function Login() {
         }}
       />
     )
+  }
+
+  if (!passwordAllowed) {
+    return <Navigate to="/landing" />
   }
 
   return (
