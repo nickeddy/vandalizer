@@ -8,6 +8,10 @@ vi.mock('../../hooks/useAuth', () => ({
   useAuth: () => ({ login: mockLogin }),
 }))
 
+vi.mock('@tanstack/react-router', () => ({
+  Link: ({ children, ...props }: { children: React.ReactNode; to?: string }) => <a {...props}>{children}</a>,
+}))
+
 beforeEach(() => {
   mockLogin.mockReset()
 })
