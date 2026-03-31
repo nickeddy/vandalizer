@@ -555,9 +555,11 @@ async def user_leaderboard(
         all_users = await User.find().limit(10000).to_list()
     user_map = {u.user_id: u for u in all_users}
 
-    # Build result list
+    # Build result list — include ALL users, not just those with activity
     result: list[UserLeaderboardItem] = []
+    seen_uids: set[str] = set()
     for uid, agg in user_agg.items():
+        seen_uids.add(uid)
         u = user_map.get(uid)
         result.append(
             UserLeaderboardItem(
@@ -582,9 +584,31 @@ async def user_leaderboard(
             )
         )
 
-    # Sort by tokens desc, take top 100
+    # Include users with no activity events (e.g. new demo users)
+    for u in all_users:
+        if u.user_id not in seen_uids:
+            result.append(
+                UserLeaderboardItem(
+                    user_id=u.user_id,
+                    name=u.name,
+                    email=u.email,
+                    is_admin=(u.is_admin if show_platform_role_flags else False),
+                    is_staff=(
+                        getattr(u, "is_staff", False)
+                        if show_platform_role_flags
+                        else False
+                    ),
+                    is_examiner=(
+                        getattr(u, "is_examiner", False)
+                        if show_platform_role_flags
+                        else False
+                    ),
+                )
+            )
+
+    # Sort by tokens desc
     result.sort(key=lambda x: x.tokens_total, reverse=True)
-    return result[:100]
+    return result
 
 
 # ---------------------------------------------------------------------------
