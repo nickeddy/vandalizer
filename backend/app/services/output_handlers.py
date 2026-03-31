@@ -460,12 +460,12 @@ def save_extraction_results_to_folder(
     file_ext = ext_map.get(format_type, format_type)
     filename = f"{filename}.{file_ext}"
 
-    # Flatten extraction results (may be a list of per-doc dicts)
+    # Flatten extraction results (list of entity dicts with document_id)
     if isinstance(extraction_results, list) and extraction_results:
-        flat_results = extraction_results[0] if len(extraction_results) == 1 else {}
+        flat_results = {}
         for d in extraction_results:
             if isinstance(d, dict):
-                flat_results.update(d)
+                flat_results.update({k: v for k, v in d.items() if k != "document_id"})
     elif isinstance(extraction_results, dict):
         flat_results = extraction_results
     else:

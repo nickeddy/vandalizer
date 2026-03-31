@@ -68,7 +68,7 @@ class ExtractionTriggerEvent(Document):
     document_uuids: list[str] = Field(default_factory=list)
 
     # Results
-    result: Optional[dict] = None  # {doc_uuid: {key: value, ...}, ...}
+    result: Optional[list] = None  # [{document_id, field: value, ...}, ...]
     error: Optional[str] = None
 
     # Timing

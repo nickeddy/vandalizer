@@ -1270,7 +1270,7 @@ class TestPollingEndpoint:
         ext_event.created_at = datetime.datetime.now(datetime.timezone.utc)
         ext_event.started_at = datetime.datetime.now(datetime.timezone.utc)
         ext_event.completed_at = datetime.datetime.now(datetime.timezone.utc)
-        ext_event.result = {"doc-1": {"name": "Acme Corp"}}
+        ext_event.result = [{"document_id": "doc-1", "name": "Acme Corp"}]
         ext_event.error = None
 
         with patch("app.dependencies.User") as MockUser, \
@@ -1287,7 +1287,7 @@ class TestPollingEndpoint:
         body = resp.json()
         assert body["status"] == "completed"
         assert body["action_type"] == "extraction"
-        assert body["output"] == {"doc-1": {"name": "Acme Corp"}}
+        assert body["output"] == [{"document_id": "doc-1", "name": "Acme Corp"}]
 
     @pytest.mark.asyncio
     async def test_poll_wrong_user_returns_404(self, client):
