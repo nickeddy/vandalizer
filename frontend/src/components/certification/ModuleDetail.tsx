@@ -200,11 +200,11 @@ export function ModuleDetail({ module, moduleProgress, onValidate, onComplete, o
               </div>
               <button
                 onClick={onProvision}
-                disabled={provisioning || isProvisioned}
+                disabled={provisioning}
                 className={cn(
                   'flex items-center gap-2 px-4 py-2 text-sm font-semibold transition-all disabled:opacity-50',
                   isProvisioned
-                    ? 'bg-green-100 text-green-700 cursor-default'
+                    ? 'bg-green-100 text-green-700 hover:bg-green-200'
                     : 'bg-blue-600 text-white hover:bg-blue-700',
                 )}
                 style={{ borderRadius: 'var(--ui-radius, 12px)' }}

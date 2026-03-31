@@ -188,10 +188,11 @@ async def provision_module_documents(user, module_id: str, settings) -> dict:
             log.warning("Certification PDF not found: %s", filepath)
             continue
 
-        # Check if already uploaded
+        # Check if already uploaded (skip soft-deleted docs)
         existing = await SmartDocument.find_one(
             SmartDocument.title == filename,
             SmartDocument.user_id == user_id,
+            SmartDocument.soft_deleted != True,  # noqa: E712
         )
         if existing:
             provisioned.append(existing.uuid)
