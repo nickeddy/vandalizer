@@ -751,7 +751,13 @@ export default function Certification() {
   const { progress, loading, validate, complete, provision, getExercise, submitAssessment } = useCertification()
   const queryClient = useQueryClient()
   const { toast } = useToast()
-  const [activeModule, setActiveModule] = useState<string | null>(null)
+  const [activeModule, setActiveModuleState] = useState<string | null>(() => {
+    try { return localStorage.getItem('cert-active-module') } catch { return null }
+  })
+  const setActiveModule = useCallback((id: string | null) => {
+    setActiveModuleState(id)
+    try { if (id) localStorage.setItem('cert-active-module', id); else localStorage.removeItem('cert-active-module') } catch {}
+  }, [])
   const [validationResult, setValidationResult] = useState<ValidationResult | null>(null)
   const [completionResult, setCompletionResult] = useState<CompletionResult | null>(null)
   const [validating, setValidating] = useState(false)
