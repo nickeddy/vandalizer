@@ -26,6 +26,7 @@ import {
   getQualitySummary, getQualityTimeline, runRegressionSuite,
   getQualityAlerts, acknowledgeAlert, getQualityItems, getQualityItemDetail,
   adminListAllTeams, adminCreateTeam, adminAddUserToTeam, adminRemoveUserFromTeam, getIsolatedUsers,
+  updateUserRoles,
 } from '../api/admin'
 import { getTeamMembers } from '../api/teams'
 import * as orgApi from '../api/organizations'
@@ -450,10 +451,12 @@ function UsageTab() {
 type UserSortKey = 'tokens_total' | 'workflows_run' | 'conversations' | 'last_active' | 'name'
 
 function UserDrillDown({ userId, onBack }: { userId: string; onBack: () => void }) {
+  const { user: currentUser } = useAuth()
   const [data, setData] = useState<UserDetailResponse | null>(null)
   const [days, setDays] = useState(30)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [savingRoles, setSavingRoles] = useState(false)
 
   const load = useCallback(() => {
     setLoading(true)
@@ -496,6 +499,54 @@ function UserDrillDown({ userId, onBack }: { userId: string; onBack: () => void 
           <div style={{ fontSize: 13, color: '#6b7280' }}>{data.email || data.user_id}</div>
         </div>
       </div>
+
+      {/* Role management (admin only) */}
+      {currentUser?.is_admin && (
+        <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 'var(--ui-radius, 12px)', padding: '16px 20px' }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 12 }}>Platform Roles</div>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+            {(['is_admin', 'is_staff', 'is_examiner'] as const).map(role => {
+              const label = role === 'is_admin' ? 'Admin' : role === 'is_staff' ? 'Staff' : 'Examiner'
+              const active = !!data[role]
+              return (
+                <button
+                  key={role}
+                  disabled={savingRoles}
+                  onClick={async () => {
+                    setSavingRoles(true)
+                    try {
+                      await updateUserRoles(userId, { [role]: !active })
+                      setData(prev => prev ? { ...prev, [role]: !active } : prev)
+                    } finally {
+                      setSavingRoles(false)
+                    }
+                  }}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 8,
+                    padding: '8px 16px', borderRadius: 'var(--ui-radius, 12px)',
+                    border: active ? '2px solid #22c55e' : '2px solid #e5e7eb',
+                    background: active ? '#f0fdf4' : '#fff',
+                    cursor: savingRoles ? 'wait' : 'pointer',
+                    fontSize: 13, fontWeight: 600,
+                    color: active ? '#166534' : '#6b7280',
+                    opacity: savingRoles ? 0.6 : 1,
+                  }}
+                >
+                  <div style={{
+                    width: 18, height: 18, borderRadius: 4,
+                    border: active ? '2px solid #22c55e' : '2px solid #d1d5db',
+                    background: active ? '#22c55e' : '#fff',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}>
+                    {active && <Check size={12} color="#fff" />}
+                  </div>
+                  {label}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Time range */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>

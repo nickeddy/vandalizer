@@ -48,6 +48,7 @@ export interface UserLeaderboardItem {
   name: string | null
   email: string | null
   is_admin: boolean
+  is_staff: boolean
   is_examiner: boolean
   tokens_total: number
   workflows_run: number
@@ -118,6 +119,7 @@ export interface UserDetailResponse {
   name: string | null
   email: string | null
   is_admin: boolean
+  is_staff: boolean
   is_examiner: boolean
   tokens_in: number
   tokens_out: number
@@ -258,6 +260,13 @@ export function adminRemoveUserFromTeam(teamUuid: string, userId: string) {
 
 export function getIsolatedUsers() {
   return apiFetch<IsolatedUserItem[]>('/api/admin/users/isolated')
+}
+
+export function updateUserRoles(userId: string, roles: { is_admin?: boolean; is_staff?: boolean; is_examiner?: boolean }) {
+  return apiFetch<{ ok: boolean }>(`/api/admin/users/${encodeURIComponent(userId)}/roles`, {
+    method: 'PUT',
+    body: JSON.stringify(roles),
+  })
 }
 
 // Models

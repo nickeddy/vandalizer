@@ -1021,6 +1021,45 @@ async def user_detail(
 
 
 # ---------------------------------------------------------------------------
+# 3c. PUT /users/{user_id}/roles  - Update platform roles
+# ---------------------------------------------------------------------------
+
+
+class UpdateRolesRequest(BaseModel):
+    is_admin: Optional[bool] = None
+    is_staff: Optional[bool] = None
+    is_examiner: Optional[bool] = None
+
+
+@router.put("/users/{user_id}/roles")
+async def update_user_roles(
+    user_id: str,
+    body: UpdateRolesRequest,
+    user: User = Depends(get_current_user),
+):
+    await _require_superadmin(user)
+
+    target = await User.find_one(User.user_id == user_id)
+    if not target:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if body.is_admin is not None:
+        target.is_admin = body.is_admin
+    if body.is_staff is not None:
+        target.is_staff = body.is_staff
+    if body.is_examiner is not None:
+        target.is_examiner = body.is_examiner
+    await target.save()
+
+    await _audit(
+        user, "update_user_roles",
+        f"Updated roles for {user_id}: admin={target.is_admin}, staff={target.is_staff}, examiner={target.is_examiner}",
+    )
+
+    return {"ok": True}
+
+
+# ---------------------------------------------------------------------------
 # 4. GET /workflows  - Paginated workflow events
 # ---------------------------------------------------------------------------
 
