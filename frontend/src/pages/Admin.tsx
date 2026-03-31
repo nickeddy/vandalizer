@@ -37,6 +37,7 @@ import {
 import { getAdminPromptOverview, adminUpdatePrompt, type PromptOverview } from '../api/feedbackPrompt'
 import type { DemoAdminStats, DemoApplication as DemoApp, PostExperienceResponseAdmin } from '../types/demo'
 import { POST_SURVEY_FIELDS } from '../components/survey/postSurveyFields'
+import { PRE_SURVEY_FIELDS } from './Demo'
 import { SurveyFieldRenderer } from '../components/survey/SurveyFieldRenderer'
 import type {
   UsageStats, TimeseriesResponse, UserLeaderboardItem, TeamLeaderboardItem,
@@ -3201,11 +3202,92 @@ function ConfigTab() {
 // Demo Program Tab
 // ---------------------------------------------------------------------------
 
+function DemoResponseDetail({ responses }: { responses: Record<string, unknown> }) {
+  if (!responses || Object.keys(responses).length === 0) {
+    return <div style={{ padding: '16px 0', color: '#9ca3af', fontSize: 13 }}>No onboarding responses recorded.</div>
+  }
+
+  // Group fields by section using the PRE_SURVEY_FIELDS definitions
+  const sections: { name: string; items: { label: string; value: string }[] }[] = []
+  let currentSection = ''
+  let currentItems: { label: string; value: string }[] = []
+
+  for (const field of PRE_SURVEY_FIELDS) {
+    if (field.type === 'info') continue
+    if (field.section && field.section !== currentSection) {
+      if (currentItems.length > 0) sections.push({ name: currentSection, items: currentItems })
+      currentSection = field.section
+      currentItems = []
+    }
+
+    // Handle likert_group: each statement is a sub-key
+    if (field.type === 'likert_group' && field.statements) {
+      for (const stmt of field.statements) {
+        const val = responses[stmt.key]
+        if (val !== undefined && val !== null && val !== '') {
+          currentItems.push({ label: stmt.label, value: String(val) })
+        }
+      }
+      continue
+    }
+
+    const val = responses[field.key]
+    if (val === undefined || val === null || val === '') continue
+    const display = Array.isArray(val) ? val.join(', ') : String(val)
+    currentItems.push({ label: field.label, value: display })
+  }
+  if (currentItems.length > 0) sections.push({ name: currentSection, items: currentItems })
+
+  // Also show any keys not in PRE_SURVEY_FIELDS (future-proofing)
+  const knownKeys = new Set(PRE_SURVEY_FIELDS.flatMap(f =>
+    f.type === 'likert_group' && f.statements ? f.statements.map(s => s.key) : [f.key]
+  ))
+  const extraItems: { label: string; value: string }[] = []
+  for (const [key, val] of Object.entries(responses)) {
+    if (knownKeys.has(key) || val === undefined || val === null || val === '') continue
+    const display = Array.isArray(val) ? val.join(', ') : String(val)
+    extraItems.push({ label: key, value: display })
+  }
+  if (extraItems.length > 0) sections.push({ name: 'Other', items: extraItems })
+
+  const likertLabels: Record<string, string> = {
+    '1': 'Strongly Disagree',
+    '2': 'Disagree',
+    '3': 'Neutral',
+    '4': 'Agree',
+    '5': 'Strongly Agree',
+  }
+
+  return (
+    <div style={{ paddingTop: 16 }}>
+      <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12, color: '#111827' }}>Onboarding Responses</div>
+      {sections.map((section) => (
+        <div key={section.name} style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>
+            {section.name}
+          </div>
+          <div style={{ display: 'grid', gap: 6 }}>
+            {section.items.map((item) => (
+              <div key={item.label} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, fontSize: 13, padding: '6px 0', borderBottom: '1px solid #f3f4f6' }}>
+                <span style={{ color: '#374151', fontWeight: 500 }}>{item.label}</span>
+                <span style={{ color: '#111827' }}>
+                  {likertLabels[item.value] || (item.value.match(/^\d+$/) && item.label.toLowerCase().includes('minute') ? `${item.value} min` : item.value)}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 function DemoTab() {
   const [stats, setStats] = useState<DemoAdminStats | null>(null)
   const [apps, setApps] = useState<DemoApp[]>([])
   const [statusFilter, setStatusFilter] = useState<string>('')
   const [loading, setLoading] = useState(true)
+  const [expandedUuid, setExpandedUuid] = useState<string | null>(null)
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -3332,57 +3414,74 @@ function DemoTab() {
             <tbody>
               {apps.map((app) => {
                 const sc = statusColors[app.status] || { bg: '#f3f4f6', text: '#374151' }
+                const isExpanded = expandedUuid === app.uuid
                 return (
-                  <tr key={app.uuid} style={{ borderBottom: '1px solid #f3f4f6' }}>
-                    <td style={{ padding: '12px 16px', fontWeight: 500 }}>{app.name}</td>
-                    <td style={{ padding: '12px 16px', color: '#6b7280' }}>{app.email}</td>
-                    <td style={{ padding: '12px 16px', color: '#6b7280' }}>{app.organization}</td>
-                    <td style={{ padding: '12px 16px' }}>
-                      <span style={{
-                        display: 'inline-block', padding: '2px 10px', borderRadius: 12,
-                        background: sc.bg, color: sc.text, fontSize: 12, fontWeight: 600,
-                      }}>
-                        {app.status}
-                      </span>
-                    </td>
-                    <td style={{ padding: '12px 16px', color: '#6b7280', fontSize: 13 }}>
-                      {formatDate(app.created_at)}
-                    </td>
-                    <td style={{ padding: '12px 16px' }}>
-                      <div style={{ display: 'flex', gap: 6 }}>
-                        {app.status === 'pending' && (
-                          <button
-                            onClick={() => handleActivate(app.uuid)}
-                            style={{
-                              padding: '4px 12px', borderRadius: 6, border: '1px solid #16a34a',
-                              background: '#f0fdf4', color: '#16a34a', fontSize: 12, fontWeight: 600,
-                              cursor: 'pointer', fontFamily: 'inherit',
-                            }}
-                          >
-                            Activate
-                          </button>
-                        )}
-                        {(app.status === 'expired' || app.status === 'completed') && !app.admin_released && (
-                          <button
-                            onClick={() => handleRelease(app.uuid)}
-                            style={{
-                              padding: '4px 12px', borderRadius: 6, border: '1px solid #2563eb',
-                              background: '#eff6ff', color: '#2563eb', fontSize: 12, fontWeight: 600,
-                              cursor: 'pointer', fontFamily: 'inherit',
-                            }}
-                          >
-                            Release
-                          </button>
-                        )}
-                        {app.admin_released && (
-                          <span style={{ fontSize: 12, color: '#16a34a', fontWeight: 500 }}>Released</span>
-                        )}
-                        {app.post_questionnaire_completed && (
-                          <span style={{ fontSize: 12, color: '#6b7280' }}>Feedback done</span>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
+                  <React.Fragment key={app.uuid}>
+                    <tr
+                      onClick={() => setExpandedUuid(isExpanded ? null : app.uuid)}
+                      style={{ borderBottom: isExpanded ? 'none' : '1px solid #f3f4f6', cursor: 'pointer' }}
+                    >
+                      <td style={{ padding: '12px 16px', fontWeight: 500 }}>
+                        <span style={{ marginRight: 6, color: '#9ca3af', fontSize: 11 }}>{isExpanded ? '▼' : '▶'}</span>
+                        {app.name}
+                        {app.title && <span style={{ color: '#9ca3af', fontWeight: 400, marginLeft: 6, fontSize: 12 }}>{app.title}</span>}
+                      </td>
+                      <td style={{ padding: '12px 16px', color: '#6b7280' }}>{app.email}</td>
+                      <td style={{ padding: '12px 16px', color: '#6b7280' }}>{app.organization}</td>
+                      <td style={{ padding: '12px 16px' }}>
+                        <span style={{
+                          display: 'inline-block', padding: '2px 10px', borderRadius: 12,
+                          background: sc.bg, color: sc.text, fontSize: 12, fontWeight: 600,
+                        }}>
+                          {app.status}
+                        </span>
+                      </td>
+                      <td style={{ padding: '12px 16px', color: '#6b7280', fontSize: 13 }}>
+                        {formatDate(app.created_at)}
+                      </td>
+                      <td style={{ padding: '12px 16px' }}>
+                        <div style={{ display: 'flex', gap: 6 }} onClick={(e) => e.stopPropagation()}>
+                          {app.status === 'pending' && (
+                            <button
+                              onClick={() => handleActivate(app.uuid)}
+                              style={{
+                                padding: '4px 12px', borderRadius: 6, border: '1px solid #16a34a',
+                                background: '#f0fdf4', color: '#16a34a', fontSize: 12, fontWeight: 600,
+                                cursor: 'pointer', fontFamily: 'inherit',
+                              }}
+                            >
+                              Activate
+                            </button>
+                          )}
+                          {(app.status === 'expired' || app.status === 'completed') && !app.admin_released && (
+                            <button
+                              onClick={() => handleRelease(app.uuid)}
+                              style={{
+                                padding: '4px 12px', borderRadius: 6, border: '1px solid #2563eb',
+                                background: '#eff6ff', color: '#2563eb', fontSize: 12, fontWeight: 600,
+                                cursor: 'pointer', fontFamily: 'inherit',
+                              }}
+                            >
+                              Release
+                            </button>
+                          )}
+                          {app.admin_released && (
+                            <span style={{ fontSize: 12, color: '#16a34a', fontWeight: 500 }}>Released</span>
+                          )}
+                          {app.post_questionnaire_completed && (
+                            <span style={{ fontSize: 12, color: '#6b7280' }}>Feedback done</span>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                    {isExpanded && (
+                      <tr style={{ borderBottom: '1px solid #f3f4f6' }}>
+                        <td colSpan={6} style={{ padding: '0 16px 20px', background: '#fafafa' }}>
+                          <DemoResponseDetail responses={app.questionnaire_responses} />
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
                 )
               })}
               {apps.length === 0 && (

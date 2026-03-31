@@ -23,7 +23,7 @@ import type { SurveyField, WaitlistStatusResponse } from '../types/demo'
 // Pre-survey field definitions
 // ---------------------------------------------------------------------------
 
-const PRE_SURVEY_FIELDS: SurveyField[] = [
+export const PRE_SURVEY_FIELDS: SurveyField[] = [
   // --- Demographics ---
   {
     key: 'ra_department',

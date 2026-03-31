@@ -426,6 +426,8 @@ async def admin_list_applications(status_filter: Optional[str] = None) -> list[d
             "post_questionnaire_completed": a.post_questionnaire_completed,
             "admin_released": a.admin_released,
             "created_at": a.created_at.isoformat(),
+            "title": a.title or "",
+            "questionnaire_responses": a.questionnaire_responses or {},
         }
         for a in apps
     ]

@@ -45,6 +45,7 @@ export interface FeedbackInfo {
 export interface DemoApplication {
   uuid: string
   name: string
+  title: string
   email: string
   organization: string
   status: string
@@ -54,6 +55,7 @@ export interface DemoApplication {
   post_questionnaire_completed: boolean
   admin_released: boolean
   created_at: string
+  questionnaire_responses: Record<string, unknown>
 }
 
 export interface DemoAdminStats {
