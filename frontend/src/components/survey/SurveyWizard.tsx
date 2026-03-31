@@ -39,6 +39,7 @@ export function SurveyWizard({
     setTimeout(() => {
       setCurrentStep(index)
       setAnimating(false)
+      formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }, 150)
   }
 
