@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react'
-import { BookOpen, ChevronDown, ChevronRight, Lightbulb, Play } from 'lucide-react'
+import { useMemo } from 'react'
+import { BookOpen, Lightbulb, Play } from 'lucide-react'
 import DOMPurify from 'dompurify'
 import { marked } from 'marked'
 import { cn } from '../../lib/cn'
@@ -28,28 +28,13 @@ const DIAGRAM_MAP: Record<string, React.ComponentType> = {
   'step-granularity': StepGranularityDiagram,
 }
 
-function CollapsibleTerm({ term, definition }: { term: string; definition: string }) {
-  const [open, setOpen] = useState(false)
-
+function GlossaryTerm({ term, definition }: { term: string; definition: string }) {
   return (
-    <button
-      onClick={() => setOpen(!open)}
-      className={cn(
-        'w-full text-left p-3 border transition-all',
-        open ? 'border-purple-300 bg-purple-50/50' : 'border-gray-200 bg-white hover:border-purple-200',
-      )}
-      style={{ borderRadius: 'var(--ui-radius, 12px)' }}
-    >
-      <div className="flex items-center justify-between">
-        <span className="font-semibold text-sm text-gray-900">{term}</span>
-        {open ? <ChevronDown size={14} className="text-gray-400" /> : <ChevronRight size={14} className="text-gray-400" />}
-      </div>
-      <div className={cn('thinking-collapse', open && 'open')}>
-        <div>
-          <p className="text-sm text-gray-600 mt-2 leading-relaxed">{definition}</p>
-        </div>
-      </div>
-    </button>
+    <div className="flex gap-2 py-1.5" style={{ borderBottom: '1px solid #f3f4f6' }}>
+      <span className="font-semibold text-sm text-gray-900 shrink-0">{term}</span>
+      <span className="text-sm text-gray-500">&mdash;</span>
+      <span className="text-sm text-gray-600 leading-relaxed">{definition}</span>
+    </div>
   )
 }
 
@@ -93,9 +78,9 @@ export function LessonContent({ section }: { section: LessonSection }) {
         <h4 className="text-sm font-bold text-gray-900 mb-2">{section.title}</h4>
 
         {keyTerms ? (
-          <div className="space-y-2">
+          <div>
             {keyTerms.map((kt, i) => (
-              <CollapsibleTerm key={i} term={kt.term} definition={kt.definition} />
+              <GlossaryTerm key={i} term={kt.term} definition={kt.definition} />
             ))}
           </div>
         ) : (
