@@ -5,7 +5,7 @@ import {
   ChevronRight, RefreshCw, MessageSquare, Search, Zap, Bug,
   CheckCircle2, XCircle, Clock, Download, TrendingUp, TrendingDown,
   ChevronDown, ChevronUp, ArrowUpDown, Play, Minus, AlertCircle,
-  ArrowLeft, FileText, FolderTree, X, Eye, CheckCircle,
+  ArrowLeft, FileText, FolderTree, X, Eye, Check, CheckCircle,
 } from 'lucide-react'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
