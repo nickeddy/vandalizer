@@ -34,7 +34,6 @@ jobs:
   backend-backlog:
     name: Backend Advisory Backlog
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v6
 
@@ -50,6 +49,7 @@ jobs:
         run: make backend-install
 
       - name: Run backend backlog checks (typecheck + dependency audit)
+        continue-on-error: true
         run: make backend-backlog
 
   backend-test:
