@@ -6,7 +6,7 @@ requires-python = ">=3.11,<3.13"
 dependencies = [
     "fastapi>=0.115,<1",
     "uvicorn[standard]>=0.34,<1",
-    "beanie>=1.27,<2",
+    "beanie>=1.27,<3",
     "motor>=3.6,<4",
     "pydantic-settings>=2.7,<3",
     "PyJWT[crypto]>=2.12,<3",
