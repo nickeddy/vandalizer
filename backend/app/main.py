@@ -74,8 +74,9 @@ async def lifespan(app: FastAPI):
     await init_db(get_settings())
 
     # Seed default feedback prompts for trial check-ins
-    from app.services.feedback_prompt_service import seed_default_prompts
-    await seed_default_prompts()
+    if get_settings().enable_trial_system:
+        from app.services.feedback_prompt_service import seed_default_prompts
+        await seed_default_prompts()
 
     yield
     logger.info("Shutting down Vandalizer backend")
@@ -191,7 +192,8 @@ app.include_router(verification.router, prefix="/api/verification", tags=["verif
 app.include_router(office.router, prefix="/api/office", tags=["office"])
 app.include_router(automations.router, prefix="/api/automations", tags=["automations"])
 app.include_router(knowledge.router, prefix="/api/knowledge", tags=["knowledge"])
-app.include_router(demo.router, prefix="/api/demo", tags=["demo"])
+if _boot_settings.enable_trial_system:
+    app.include_router(demo.router, prefix="/api/demo", tags=["demo"])
 app.include_router(graph_webhooks.router, prefix="/api/webhooks/graph", tags=["webhooks"])
 app.include_router(browser_automation.router, prefix="/api/browser-automation", tags=["browser-automation"])
 app.include_router(certification.router, prefix="/api/certification", tags=["certification"])
@@ -201,7 +203,8 @@ app.include_router(approvals.router, prefix="/api/approvals", tags=["approvals"]
 app.include_router(notifications.router, prefix="/api/notifications", tags=["notifications"])
 app.include_router(spaces.router, prefix="/api/spaces", tags=["spaces"])
 app.include_router(support.router, prefix="/api/support", tags=["support"])
-app.include_router(feedback_prompt.router, prefix="/api/feedback/prompts", tags=["feedback-prompts"])
+if _boot_settings.enable_trial_system:
+    app.include_router(feedback_prompt.router, prefix="/api/feedback/prompts", tags=["feedback-prompts"])
 
 
 # ---------------------------------------------------------------------------
