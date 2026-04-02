@@ -69,7 +69,7 @@ logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI):  # type: ignore[no-untyped-def]
     logger.info("Starting Vandalizer backend")
     await init_db(get_settings())
 
@@ -92,7 +92,7 @@ app = FastAPI(
 app.state.limiter = limiter
 
 
-def _rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded):
+def _rate_limit_exceeded_handler(request: Request, exc: Exception) -> JSONResponse:
     return JSONResponse(
         status_code=429,
         content={"detail": "Rate limit exceeded. Please try again later."},
@@ -102,10 +102,11 @@ def _rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded):
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 
-def _app_error_handler(request: Request, exc: AppError):
+def _app_error_handler(request: Request, exc: Exception) -> JSONResponse:
+    app_exc: AppError = exc  # type: ignore[assignment]
     return JSONResponse(
-        status_code=exc.status_code,
-        content={"detail": exc.message},
+        status_code=app_exc.status_code,
+        content={"detail": app_exc.message},
     )
 
 
@@ -117,7 +118,7 @@ app.add_exception_handler(AppError, _app_error_handler)
 if not _boot_settings.is_production:
     import traceback as _tb
 
-    async def _dev_unhandled_error(request: Request, exc: Exception):
+    async def _dev_unhandled_error(request: Request, exc: Exception) -> JSONResponse:
         tb = _tb.format_exception(type(exc), exc, exc.__traceback__)
         logger.error("Unhandled exception:\n%s", "".join(tb))
         return JSONResponse(
@@ -135,7 +136,7 @@ if not _boot_settings.is_production:
 # Security headers middleware
 # ---------------------------------------------------------------------------
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request: Request, call_next):
+    async def dispatch(self, request: Request, call_next):  # type: ignore[no-untyped-def]
         response = await call_next(request)
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"
@@ -216,7 +217,7 @@ Instrumentator().instrument(app).expose(app, endpoint="/api/metrics")
 
 
 @app.get("/api/health")
-async def health():
+async def health() -> JSONResponse:
     """Health check that verifies all critical dependencies."""
     checks: dict[str, str] = {}
     settings = get_settings()
