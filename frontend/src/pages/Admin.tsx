@@ -2406,7 +2406,7 @@ function ConfigTab() {
     } catch (e) {
       setModelTestResults(prev => ({ ...prev, [index]: { ok: false, message: e instanceof Error ? e.message : 'Test failed' } }))
     } finally {
-      setModelTesting(false)
+      setModelTesting(null)
     }
   }
 
