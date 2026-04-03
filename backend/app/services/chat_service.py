@@ -250,13 +250,11 @@ async def chat_stream(
         )
         system_prompt = DOCUMENT_CHAT_SYSTEM_PROMPT
     elif is_first_session:
-        # First-session onboarding: conversational value discovery
-        prompt = (
-            "--- BEGIN VANDALIZER CONTEXT ---\n"
-            f"{VANDALIZER_CONTEXT}\n"
-            "--- END VANDALIZER CONTEXT ---\n\n"
-            f"User message: {message}"
-        )
+        # First-session onboarding: conversational value discovery.
+        # Do NOT inject VANDALIZER_CONTEXT here — it's a technical how-to dump
+        # that causes the LLM to skip the conversation and spit out directions.
+        # The FIRST_SESSION_SYSTEM_PROMPT already has everything it needs.
+        prompt = message
         system_prompt = FIRST_SESSION_SYSTEM_PROMPT
     elif include_onboarding_context:
         # Inject Vandalizer help context only when explicitly requested
