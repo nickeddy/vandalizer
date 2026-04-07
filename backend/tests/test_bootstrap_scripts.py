@@ -1,6 +1,6 @@
 """Focused tests for bootstrap helper scripts."""
 
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -40,6 +40,7 @@ class TestEnsureAdmin:
         existing.is_admin = True
         existing.is_examiner = True
         existing.user_id = "admin@example.edu"
+        existing.save = AsyncMock()
 
         class FakeUser:
             email = "email-field"
@@ -49,8 +50,11 @@ class TestEnsureAdmin:
                 return existing
 
         monkeypatch.setattr("create_admin.User", FakeUser)
+        monkeypatch.setattr("app.utils.security.hash_password", lambda p: f"hashed:{p}")
 
-        user, status = await ensure_admin(" Admin@Example.edu ", "ignored", "Admin")
+        user, status = await ensure_admin(" Admin@Example.edu ", "newpass", "Admin")
 
         assert user is existing
         assert status == "unchanged"
+        assert existing.password_hash == "hashed:newpass"
+        existing.save.assert_awaited_once()

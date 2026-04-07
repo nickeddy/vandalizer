@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useRef, useState, useCallback, type DragEvent } from 'react'
 import { Loader2, BookOpen, X, ArrowDown, ChevronRight, Shield, CheckCircle2, Upload } from 'lucide-react'
+import { useQueryClient } from '@tanstack/react-query'
 import { ChatMessage } from './ChatMessage'
 import { ChatInput } from './ChatInput'
 import { AttachmentList } from './AttachmentList'
@@ -7,7 +8,8 @@ import { useChat } from '../../hooks/useChat'
 import { useOnboarding } from '../../hooks/useOnboarding'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { useToast } from '../../contexts/ToastContext'
-import { addLink, addDocument, removeDocument, removeLink } from '../../api/chat'
+import { addLink, removeDocument, removeLink } from '../../api/chat'
+import { uploadFile } from '../../api/files'
 import { getUserConfig, updateUserConfig, markFirstSessionComplete } from '../../api/config'
 import type { FileAttachment, UrlAttachment } from '../../types/chat'
 
@@ -65,7 +67,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     setActivity,
   } = useChat()
 
-  const { bumpActivitySignal, processingDoc, selectedDocUuids, selectedFolderUuids, activeKBUuid, activeKBTitle, deactivateKB } = useWorkspace()
+  const { bumpActivitySignal, processingDoc, selectedDocUuids, setSelectedDocUuids, selectedDocNames, setSelectedDocNames, selectedFolderUuids, activeKBUuid, activeKBTitle, deactivateKB } = useWorkspace()
   const { toast } = useToast()
   const { pills: onboardingPills, isFirstSession, loading: onboardingLoading } = useOnboarding()
   // Lock the first-session flag once it's set so remounts/refetches can't
@@ -86,6 +88,8 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
   const prevStreamingRef = useRef(false)
   const [showScrollDown, setShowScrollDown] = useState(false)
   const prevScrollInfo = useRef({ scrollHeight: 0, scrollTop: 0, clientHeight: 0 })
+  const [dragOver, setDragOver] = useState(false)
+  const dragCounter = useRef(0)
 
 
   // Load saved model preference on mount
@@ -216,18 +220,30 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
   }
 
 
+  const queryClient = useQueryClient()
+
   const handleAttachFile = async (files: File[]) => {
     setAttachLoading(true)
     try {
-      const result = await addDocument(files, activityId)
-      if (result.attachments) {
-        setFileAttachments((prev) => [...prev, ...result.attachments])
+      // Upload to the file browser (single source of truth) and auto-select
+      const newNames: Record<string, string> = {}
+      const newUuids: string[] = []
+      for (const file of files) {
+        const ext = file.name.split('.').pop() || ''
+        const base64 = await fileToBase64(file)
+        const result = await uploadFile({ contentAsBase64String: base64, fileName: file.name, extension: ext })
+        if (result.uuid) {
+          newUuids.push(result.uuid)
+          newNames[result.uuid] = file.name
+        }
       }
-      if (result.activity_id && result.conversation_uuid) {
-        setActivity(result.activity_id, result.conversation_uuid)
+      if (newUuids.length > 0) {
+        setSelectedDocUuids([...selectedDocUuids, ...newUuids])
+        setSelectedDocNames({ ...selectedDocNames, ...newNames })
+        queryClient.invalidateQueries({ queryKey: ['documents'] })
       }
     } catch (err) {
-      toast(err instanceof Error ? err.message : 'Failed to attach file', 'error')
+      toast(err instanceof Error ? err.message : 'Failed to upload file', 'error')
     } finally {
       setAttachLoading(false)
     }
@@ -274,6 +290,40 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     }
   }
 
+  const handleDragEnter = useCallback((e: DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    dragCounter.current++
+    if (e.dataTransfer.types.includes('Files')) setDragOver(true)
+  }, [])
+
+  const handleDragOver = useCallback((e: DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy'
+  }, [])
+
+  const handleDragLeave = useCallback((e: DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    dragCounter.current--
+    if (dragCounter.current <= 0) {
+      dragCounter.current = 0
+      setDragOver(false)
+    }
+  }, [])
+
+  const handleDrop = (e: DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    dragCounter.current = 0
+    setDragOver(false)
+    if (e.dataTransfer.files.length > 0) {
+      const files = Array.from(e.dataTransfer.files)
+      handleAttachFile(files)
+    }
+  }
+
   const handleExport = (format: string) => {
     const text = messages
       .map(m => `${m.role === 'user' ? 'User' : 'Assistant'}:\n${m.content}`)
@@ -298,13 +348,56 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
   }
 
   return (
-    <div className="flex h-full flex-col">
+    <div
+      className="flex h-full flex-col"
+      onDragEnter={handleDragEnter}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+      style={{ position: 'relative' }}
+    >
+      {/* Drop overlay */}
+      {dragOver && (
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            zIndex: 1000,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 8,
+            backgroundColor: 'color-mix(in srgb, var(--highlight-color, #eab308) 6%, rgba(255,255,255,0.95))',
+            border: '2px dashed var(--highlight-color, #eab308)',
+            borderRadius: 'var(--ui-radius, 12px)',
+            pointerEvents: 'none',
+          }}
+        >
+          <Upload size={32} style={{ color: 'var(--highlight-color, #eab308)' }} />
+          <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--highlight-color, #eab308)' }}>
+            Drop files to add to chat &amp; files
+          </div>
+          <div style={{ fontSize: 12, color: '#6b7280' }}>
+            pdf, doc, docx, xls, xlsx, csv
+          </div>
+        </div>
+      )}
+
       {/* Attachments bar */}
       <AttachmentList
         fileAttachments={fileAttachments}
         urlAttachments={urlAttachments}
+        selectedDocUuids={selectedDocUuids}
+        selectedDocNames={selectedDocNames}
         onRemoveFile={handleRemoveFile}
         onRemoveUrl={handleRemoveUrl}
+        onDeselectDoc={(uuid) => {
+          setSelectedDocUuids(selectedDocUuids.filter(u => u !== uuid))
+          const next = { ...selectedDocNames }
+          delete next[uuid]
+          setSelectedDocNames(next)
+        }}
       />
 
       {attachLoading && (
@@ -694,4 +787,16 @@ function downloadBlob(blob: Blob, filename: string) {
   a.download = filename
   a.click()
   URL.revokeObjectURL(url)
+}
+
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      const result = reader.result as string
+      resolve(result.split(',')[1])
+    }
+    reader.onerror = reject
+    reader.readAsDataURL(file)
+  })
 }
