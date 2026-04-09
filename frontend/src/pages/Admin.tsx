@@ -3438,6 +3438,80 @@ function DemoTab() {
 
   const [actionLoading, setActionLoading] = useState<string | null>(null)
 
+  async function handleExport() {
+    setActionLoading('export')
+    try {
+      // Fetch all applications (unfiltered) and post-survey responses
+      const [allApps, postResponses] = await Promise.all([
+        getDemoApplications(),
+        getPostExperienceResponses(),
+      ])
+
+      // Index post-survey responses by email for matching
+      const postByEmail = new Map<string, Record<string, unknown>>()
+      for (const pr of postResponses) {
+        postByEmail.set(pr.email, pr.responses)
+      }
+
+      // Build pre-survey column definitions (key + label)
+      const preCols: { key: string; label: string }[] = []
+      for (const f of PRE_SURVEY_FIELDS) {
+        if (f.type === 'info') continue
+        if (f.type === 'likert_group' && f.statements) {
+          for (const s of f.statements) preCols.push({ key: s.key, label: `Pre: ${s.label}` })
+        } else {
+          preCols.push({ key: f.key, label: `Pre: ${f.label}` })
+        }
+      }
+
+      // Build post-survey column definitions
+      const postCols: { key: string; label: string }[] = []
+      for (const f of POST_SURVEY_FIELDS) {
+        if (f.type === 'info') continue
+        if (f.type === 'likert_group' && f.statements) {
+          for (const s of f.statements) postCols.push({ key: s.key, label: `Post: ${s.label}` })
+        } else {
+          postCols.push({ key: f.key, label: `Post: ${f.label}` })
+        }
+      }
+
+      const headers = [
+        'Name', 'Title', 'Email', 'Organization', 'Status',
+        'Applied', 'Activated', 'Expires', 'Post-Survey Completed',
+        ...preCols.map(c => c.label),
+        ...postCols.map(c => c.label),
+      ]
+
+      const rows = allApps.map(app => {
+        const pre = app.questionnaire_responses || {}
+        const post = postByEmail.get(app.email) || {}
+        const fmt = (v: unknown) => {
+          if (v === null || v === undefined || v === '') return null
+          return Array.isArray(v) ? v.join('; ') : String(v)
+        }
+        return [
+          app.name,
+          app.title || null,
+          app.email,
+          app.organization,
+          app.status,
+          app.created_at ? formatDate(app.created_at) : null,
+          app.activated_at ? formatDate(app.activated_at) : null,
+          app.expires_at ? formatDate(app.expires_at) : null,
+          app.post_questionnaire_completed ? 'Yes' : 'No',
+          ...preCols.map(c => fmt(pre[c.key])),
+          ...postCols.map(c => fmt(post[c.key])),
+        ] as (string | number | null)[]
+      })
+
+      downloadCSV('demo_export.csv', headers, rows)
+    } catch {
+      alert('Failed to export demo data')
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
   async function handleActivate(uuid: string) {
     await activateDemoUser(uuid)
     loadData()
@@ -3484,16 +3558,30 @@ function DemoTab() {
     <div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
         <h2 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>Demo Program</h2>
-        <button
-          onClick={loadData}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 6,
-            padding: '8px 16px', border: '1px solid #e5e7eb', borderRadius: 8,
-            background: '#fff', cursor: 'pointer', fontSize: 13, fontFamily: 'inherit',
-          }}
-        >
-          <RefreshCw size={14} /> Refresh
-        </button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button
+            onClick={handleExport}
+            disabled={actionLoading === 'export'}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '8px 16px', border: '1px solid #e5e7eb', borderRadius: 8,
+              background: '#fff', cursor: 'pointer', fontSize: 13, fontFamily: 'inherit',
+              opacity: actionLoading === 'export' ? 0.5 : 1,
+            }}
+          >
+            <Download size={14} /> {actionLoading === 'export' ? 'Exporting...' : 'Export CSV'}
+          </button>
+          <button
+            onClick={loadData}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '8px 16px', border: '1px solid #e5e7eb', borderRadius: 8,
+              background: '#fff', cursor: 'pointer', fontSize: 13, fontFamily: 'inherit',
+            }}
+          >
+            <RefreshCw size={14} /> Refresh
+          </button>
+        </div>
       </div>
 
       {/* Stats cards */}
