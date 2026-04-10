@@ -4835,14 +4835,9 @@ function SupportTab() {
   useEffect(() => { load() }, [load])
 
   const openThread = async (uuid: string) => {
-    setThreadLoading(true)
-    try {
-      const t = await supportApi.getTicket(uuid)
-      setSelectedTicket(t)
-      await supportApi.markTicketRead(uuid)
-    } finally {
-      setThreadLoading(false)
-    }
+    const t = await supportApi.getTicket(uuid)
+    setSelectedTicket(t)
+    await supportApi.markTicketRead(uuid)
   }
 
   const handleReply = async () => {
