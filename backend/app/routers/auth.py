@@ -217,6 +217,37 @@ async def reset_password(
     return {"ok": True}
 
 
+@router.get("/magic-login")
+async def magic_login(
+    token: str = Query(...),
+    settings: Settings = Depends(get_settings),
+):
+    """Consume a one-time magic login token and redirect to the app."""
+    r = aioredis.from_url(f"redis://{settings.redis_host}:6379")
+    try:
+        user_id = await r.get(f"magic_login:{token}")
+        if not user_id:
+            return RedirectResponse(url=f"{settings.frontend_url}/landing?error=invalid_link")
+        await r.delete(f"magic_login:{token}")
+    finally:
+        await r.aclose()
+
+    user_id_str = user_id.decode() if isinstance(user_id, bytes) else user_id
+    user = await User.find_one(User.user_id == user_id_str)
+    if not user:
+        return RedirectResponse(url=f"{settings.frontend_url}/landing?error=invalid_link")
+
+    response = RedirectResponse(url=f"{settings.frontend_url}/")
+    _set_tokens(response, user, settings)
+    await audit_service.log_event(
+        action="user.magic_login",
+        actor_user_id=user.user_id,
+        resource_type="user",
+        resource_id=user.user_id,
+    )
+    return response
+
+
 @router.post("/logout")
 async def logout(response: Response):
     response.delete_cookie("access_token", path="/")

@@ -20,6 +20,7 @@ from app.services.email_service import (
     recapture_email,
 )
 from app.utils.security import hash_password
+import redis.asyncio as aioredis
 
 logger = logging.getLogger(__name__)
 
@@ -350,6 +351,27 @@ async def resend_credentials(uuid: str, settings: Settings | None = None) -> boo
 
     logger.info("Resent credentials for demo user %s", app.email)
     return True
+
+
+async def generate_magic_link(uuid: str, settings: Settings) -> str | None:
+    """Generate a one-time magic login link for a demo user (24h TTL)."""
+    app = await DemoApplication.find_one(DemoApplication.uuid == uuid)
+    if not app or app.status != "active" or not app.user_id:
+        return None
+
+    user = await User.find_one(User.user_id == app.user_id)
+    if not user:
+        return None
+
+    token = secrets.token_urlsafe(32)
+    r = aioredis.from_url(f"redis://{settings.redis_host}:6379")
+    try:
+        await r.set(f"magic_login:{token}", user.user_id, ex=86400)  # 24 hours
+    finally:
+        await r.aclose()
+
+    logger.info("Generated magic link for demo user %s", app.email)
+    return f"{settings.frontend_url}/api/auth/magic-login?token={token}"
 
 
 async def admin_release_user(demo_uuid: str) -> bool:

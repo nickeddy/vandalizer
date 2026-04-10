@@ -202,6 +202,23 @@ async def admin_bulk_resend_credentials(
     return {"ok": True, **result}
 
 
+@router.post("/admin/magic-link/{demo_uuid}")
+async def admin_magic_link(
+    demo_uuid: str,
+    user: User = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+):
+    """Generate a one-time magic login link for a demo user."""
+    _require_admin(user)
+    url = await demo_service.generate_magic_link(demo_uuid, settings)
+    if not url:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Application not found or not in active status",
+        )
+    return {"ok": True, "url": url}
+
+
 @router.post("/admin/recapture")
 async def admin_trigger_recapture(
     user: User = Depends(get_current_user),

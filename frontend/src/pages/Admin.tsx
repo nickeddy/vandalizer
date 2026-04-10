@@ -6,7 +6,7 @@ import {
   CheckCircle2, XCircle, Clock, Download, TrendingUp, TrendingDown,
   ChevronDown, ChevronUp, ArrowUpDown, Play, Minus, AlertCircle,
   ArrowLeft, FileText, FolderTree, X, Eye, Check, CheckCircle,
-  Mail, Send,
+  Mail, Send, Link,
 } from 'lucide-react'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -34,7 +34,7 @@ import * as orgApi from '../api/organizations'
 import type { Organization, OrgMember, OrgTeam } from '../api/organizations'
 import {
   getDemoStats, getDemoApplications, releaseDemoUser, activateDemoUser,
-  getPostExperienceResponses, sendTestEmail, adminResendCredentials,
+  getPostExperienceResponses, sendTestEmail, adminResendCredentials, adminGetMagicLink,
 } from '../api/demo'
 import { getAdminPromptOverview, adminUpdatePrompt, type PromptOverview } from '../api/feedbackPrompt'
 import * as supportApi from '../api/support'
@@ -3651,6 +3651,19 @@ function DemoTab() {
     }
   }
 
+  async function handleCopyMagicLink(uuid: string) {
+    setActionLoading(`magic-${uuid}`)
+    try {
+      const result = await adminGetMagicLink(uuid)
+      await navigator.clipboard.writeText(result.url)
+      alert('Magic link copied to clipboard! It expires in 24 hours and can only be used once.')
+    } catch {
+      alert('Failed to generate magic link')
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
   const statusColors: Record<string, { bg: string; text: string }> = {
     pending: { bg: '#fef3c7', text: '#92400e' },
     active: { bg: '#dcfce7', text: '#166534' },
@@ -3828,20 +3841,36 @@ function DemoTab() {
                             <Mail size={12} /> Test Email
                           </button>
                           {app.status === 'active' && (
-                            <button
-                              onClick={() => handleResendCredentials(app.uuid, app.email)}
-                              disabled={actionLoading === `resend-${app.uuid}`}
-                              title={`Resend credentials to ${app.email}`}
-                              style={{
-                                display: 'flex', alignItems: 'center', gap: 4,
-                                padding: '4px 12px', borderRadius: 6, border: '1px solid #d97706',
-                                background: '#fffbeb', color: '#92400e', fontSize: 12, fontWeight: 600,
-                                cursor: 'pointer', fontFamily: 'inherit',
-                                opacity: actionLoading === `resend-${app.uuid}` ? 0.5 : 1,
-                              }}
-                            >
-                              <Send size={12} /> Resend Creds
-                            </button>
+                            <>
+                              <button
+                                onClick={() => handleResendCredentials(app.uuid, app.email)}
+                                disabled={actionLoading === `resend-${app.uuid}`}
+                                title={`Resend credentials to ${app.email}`}
+                                style={{
+                                  display: 'flex', alignItems: 'center', gap: 4,
+                                  padding: '4px 12px', borderRadius: 6, border: '1px solid #d97706',
+                                  background: '#fffbeb', color: '#92400e', fontSize: 12, fontWeight: 600,
+                                  cursor: 'pointer', fontFamily: 'inherit',
+                                  opacity: actionLoading === `resend-${app.uuid}` ? 0.5 : 1,
+                                }}
+                              >
+                                <Send size={12} /> Resend Creds
+                              </button>
+                              <button
+                                onClick={() => handleCopyMagicLink(app.uuid)}
+                                disabled={actionLoading === `magic-${app.uuid}`}
+                                title="Copy a one-time magic login link"
+                                style={{
+                                  display: 'flex', alignItems: 'center', gap: 4,
+                                  padding: '4px 12px', borderRadius: 6, border: '1px solid #7c3aed',
+                                  background: '#f5f3ff', color: '#5b21b6', fontSize: 12, fontWeight: 600,
+                                  cursor: 'pointer', fontFamily: 'inherit',
+                                  opacity: actionLoading === `magic-${app.uuid}` ? 0.5 : 1,
+                                }}
+                              >
+                                <Link size={12} /> Copy Magic Link
+                              </button>
+                            </>
                           )}
                           {app.admin_released && (
                             <span style={{ fontSize: 12, color: '#16a34a', fontWeight: 500 }}>Released</span>

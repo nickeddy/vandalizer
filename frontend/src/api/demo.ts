@@ -77,3 +77,9 @@ export function adminResendCredentials(demoUuid: string) {
     method: 'POST',
   })
 }
+
+export function adminGetMagicLink(demoUuid: string) {
+  return apiFetch<{ ok: boolean; url: string }>(`/api/demo/admin/magic-link/${demoUuid}`, {
+    method: 'POST',
+  })
+}
