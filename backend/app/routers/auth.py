@@ -485,7 +485,7 @@ async def oauth_azure_login(settings: Settings = Depends(get_settings)):
     finally:
         await r.aclose()
 
-    redirect_uri = f"{settings.frontend_url}/api/auth/oauth/azure/callback"
+    redirect_uri = azure.get("redirect_uri") or f"{settings.frontend_url}/api/auth/oauth/azure/callback"
     params = {
         "client_id": azure["client_id"],
         "response_type": "code",
@@ -529,7 +529,7 @@ async def oauth_azure_callback(
     if not azure:
         return RedirectResponse(f"{landing}?error=oauth_failed")
 
-    redirect_uri = f"{settings.frontend_url}/api/auth/oauth/azure/callback"
+    redirect_uri = azure.get("redirect_uri") or f"{settings.frontend_url}/api/auth/oauth/azure/callback"
 
     # Exchange code for token
     try:
