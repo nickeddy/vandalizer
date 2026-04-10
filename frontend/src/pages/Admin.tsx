@@ -4791,7 +4791,6 @@ function SupportTab() {
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [selectedTicket, setSelectedTicket] = useState<SupportTicket | null>(null)
-  const [threadLoading, setThreadLoading] = useState(false)
   const [replyText, setReplyText] = useState('')
   const [replying, setReplying] = useState(false)
   const { user } = useAuth()
