@@ -394,6 +394,32 @@ async def admin_release_user(demo_uuid: str) -> bool:
     return True
 
 
+async def admin_restart_trial(demo_uuid: str) -> bool:
+    """Admin: restart the trial for an expired demo user (reset to 14 days)."""
+    app = await DemoApplication.find_one(DemoApplication.uuid == demo_uuid)
+    if not app or app.status not in ("expired", "completed"):
+        return False
+
+    now = datetime.datetime.now(datetime.timezone.utc)
+    new_expires = now + datetime.timedelta(days=TRIAL_DAYS)
+
+    app.status = "active"
+    app.expires_at = new_expires
+    app.expired_at = None
+    app.recapture_step = 0
+    app.recapture_next_at = now + datetime.timedelta(days=_RECAPTURE_SCHEDULE_DAYS[0])
+    await app.save()
+
+    if app.user_id:
+        user = await User.find_one(User.user_id == app.user_id)
+        if user:
+            user.demo_status = "active"
+            user.demo_expires_at = new_expires
+            await user.save()
+
+    return True
+
+
 async def admin_activate_user(demo_uuid: str, settings: Settings | None = None) -> bool:
     """Admin: manually activate a waitlisted user (skip queue)."""
     if settings is None:

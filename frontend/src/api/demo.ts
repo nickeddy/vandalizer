@@ -58,6 +58,10 @@ export function releaseDemoUser(demoUuid: string) {
   return apiFetch<{ ok: boolean }>(`/api/demo/admin/release/${demoUuid}`, { method: 'POST' })
 }
 
+export function restartDemoTrial(demoUuid: string) {
+  return apiFetch<{ ok: boolean }>(`/api/demo/admin/restart-trial/${demoUuid}`, { method: 'POST' })
+}
+
 export function activateDemoUser(demoUuid: string) {
   return apiFetch<{ ok: boolean }>(`/api/demo/admin/activate/${demoUuid}`, { method: 'POST' })
 }

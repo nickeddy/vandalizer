@@ -33,7 +33,7 @@ import { getTeamMembers } from '../api/teams'
 import * as orgApi from '../api/organizations'
 import type { Organization, OrgMember, OrgTeam } from '../api/organizations'
 import {
-  getDemoStats, getDemoApplications, releaseDemoUser, activateDemoUser,
+  getDemoStats, getDemoApplications, releaseDemoUser, activateDemoUser, restartDemoTrial,
   getPostExperienceResponses, sendTestEmail, adminResendCredentials, adminGetMagicLink,
 } from '../api/demo'
 import { getAdminPromptOverview, adminUpdatePrompt, type PromptOverview } from '../api/feedbackPrompt'
@@ -3626,6 +3626,19 @@ function DemoTab() {
     loadData()
   }
 
+  async function handleRestartTrial(uuid: string) {
+    if (!confirm('Restart this user\'s trial? This will give them a fresh 14-day trial.')) return
+    setActionLoading(`restart-${uuid}`)
+    try {
+      await restartDemoTrial(uuid)
+      loadData()
+    } catch {
+      alert('Failed to restart trial')
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
   async function handleTestEmail(email: string) {
     setActionLoading(`test-${email}`)
     try {
@@ -3824,6 +3837,21 @@ function DemoTab() {
                               }}
                             >
                               Release
+                            </button>
+                          )}
+                          {(app.status === 'expired' || app.status === 'completed') && (
+                            <button
+                              onClick={() => handleRestartTrial(app.uuid)}
+                              disabled={actionLoading === `restart-${app.uuid}`}
+                              title="Reset trial to 14 days and re-activate"
+                              style={{
+                                padding: '4px 12px', borderRadius: 6, border: '1px solid #d97706',
+                                background: '#fffbeb', color: '#92400e', fontSize: 12, fontWeight: 600,
+                                cursor: 'pointer', fontFamily: 'inherit',
+                                opacity: actionLoading === `restart-${app.uuid}` ? 0.5 : 1,
+                              }}
+                            >
+                              Restart Trial
                             </button>
                           )}
                           <button
