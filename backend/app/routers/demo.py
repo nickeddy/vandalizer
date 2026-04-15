@@ -6,6 +6,7 @@ from app.config import Settings
 from app.dependencies import get_current_user, get_settings
 from app.models.user import User
 from app.schemas.demo import (
+    AdminAddDemoUserRequest,
     DemoSignupRequest,
     DemoSignupResponse,
     WaitlistStatusResponse,
@@ -167,6 +168,26 @@ async def admin_restart_trial(demo_uuid: str, user: User = Depends(get_current_u
             detail="Application not found or not in active/expired/completed status",
         )
     return {"ok": True}
+
+
+@router.post("/admin/add-user")
+async def admin_add_user(
+    body: AdminAddDemoUserRequest,
+    user: User = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+):
+    """Directly add a user to the demo trial by name and email."""
+    _require_admin(user)
+    try:
+        app = await demo_service.admin_add_demo_user(
+            first_name=body.first_name,
+            last_name=body.last_name,
+            email=body.email,
+            settings=settings,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    return {"ok": True, "uuid": app.uuid}
 
 
 @router.post("/admin/activate/{demo_uuid}")

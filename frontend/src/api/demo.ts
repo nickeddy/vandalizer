@@ -82,6 +82,13 @@ export function adminResendCredentials(demoUuid: string) {
   })
 }
 
+export function adminAddDemoUser(data: { first_name: string; last_name: string; email: string }) {
+  return apiFetch<{ ok: boolean; uuid: string }>('/api/demo/admin/add-user', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
 export function adminGetMagicLink(demoUuid: string) {
   return apiFetch<{ ok: boolean; url: string }>(`/api/demo/admin/magic-link/${demoUuid}`, {
     method: 'POST',

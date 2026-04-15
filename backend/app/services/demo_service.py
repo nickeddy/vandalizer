@@ -420,6 +420,40 @@ async def admin_restart_trial(demo_uuid: str) -> bool:
     return True
 
 
+async def admin_add_demo_user(
+    first_name: str,
+    last_name: str,
+    email: str,
+    settings: Settings | None = None,
+) -> DemoApplication:
+    """Admin: create a demo user directly, skipping the application/waitlist flow."""
+    if settings is None:
+        settings = Settings()
+
+    existing = await DemoApplication.find_one(DemoApplication.email == email)
+    if existing:
+        raise ValueError("An application with this email already exists")
+
+    existing_user = await User.find_one(User.email == email)
+    if existing_user:
+        raise ValueError("An account with this email already exists")
+
+    name = f"{first_name} {last_name}"
+    app = DemoApplication(
+        uuid=secrets.token_urlsafe(16),
+        name=name,
+        email=email,
+        organization="Direct Add",
+        questionnaire_responses={},
+        status="pending",
+        created_at=datetime.datetime.now(datetime.timezone.utc),
+    )
+    await app.insert()
+
+    await _activate_application(app, settings)
+    return app
+
+
 async def admin_activate_user(demo_uuid: str, settings: Settings | None = None) -> bool:
     """Admin: manually activate a waitlisted user (skip queue)."""
     if settings is None:

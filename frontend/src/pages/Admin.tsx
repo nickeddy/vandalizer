@@ -6,7 +6,7 @@ import {
   CheckCircle2, XCircle, Clock, Download, TrendingUp, TrendingDown,
   ChevronDown, ChevronUp, ArrowUpDown, Play, Minus, AlertCircle,
   ArrowLeft, FileText, FolderTree, X, Eye, Check, CheckCircle,
-  Mail, Send, Link,
+  Mail, Send, Link, UserPlus,
 } from 'lucide-react'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -35,6 +35,7 @@ import type { Organization, OrgMember, OrgTeam } from '../api/organizations'
 import {
   getDemoStats, getDemoApplications, releaseDemoUser, activateDemoUser, restartDemoTrial,
   getPostExperienceResponses, sendTestEmail, adminResendCredentials, adminGetMagicLink,
+  adminAddDemoUser,
 } from '../api/demo'
 import { getAdminPromptOverview, adminUpdatePrompt, type PromptOverview } from '../api/feedbackPrompt'
 import * as supportApi from '../api/support'
@@ -3677,6 +3678,28 @@ function DemoTab() {
     }
   }
 
+  // --- Add user form ---
+  const [showAddUser, setShowAddUser] = useState(false)
+  const [addUserForm, setAddUserForm] = useState({ first_name: '', last_name: '', email: '' })
+  const [addUserError, setAddUserError] = useState<string | null>(null)
+
+  async function handleAddUser(e: React.FormEvent) {
+    e.preventDefault()
+    setAddUserError(null)
+    setActionLoading('add-user')
+    try {
+      await adminAddDemoUser(addUserForm)
+      setAddUserForm({ first_name: '', last_name: '', email: '' })
+      setShowAddUser(false)
+      loadData()
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to add user'
+      setAddUserError(msg)
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
   const statusColors: Record<string, { bg: string; text: string }> = {
     pending: { bg: '#fef3c7', text: '#92400e' },
     active: { bg: '#dcfce7', text: '#166534' },
@@ -3689,6 +3712,17 @@ function DemoTab() {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
         <h2 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>Demo Program</h2>
         <div style={{ display: 'flex', gap: 8 }}>
+          <button
+            onClick={() => setShowAddUser(!showAddUser)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '8px 16px', border: '1px solid #16a34a', borderRadius: 8,
+              background: showAddUser ? '#f0fdf4' : '#fff', color: '#16a34a',
+              cursor: 'pointer', fontSize: 13, fontFamily: 'inherit', fontWeight: 600,
+            }}
+          >
+            <UserPlus size={14} /> Add User
+          </button>
           <button
             onClick={handleExport}
             disabled={actionLoading === 'export'}
@@ -3713,6 +3747,70 @@ function DemoTab() {
           </button>
         </div>
       </div>
+
+      {/* Add user form */}
+      {showAddUser && (
+        <form onSubmit={handleAddUser} style={{
+          marginBottom: 24, padding: 20, borderRadius: 12,
+          border: '1px solid #bbf7d0', background: '#f0fdf4',
+        }}>
+          <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 12 }}>Add User to Trial</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr auto', gap: 12, alignItems: 'end' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: '#374151', marginBottom: 4 }}>First Name</label>
+              <input
+                required
+                value={addUserForm.first_name}
+                onChange={(e) => setAddUserForm({ ...addUserForm, first_name: e.target.value })}
+                style={{
+                  width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid #d1d5db',
+                  fontSize: 14, fontFamily: 'inherit', boxSizing: 'border-box',
+                }}
+              />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: '#374151', marginBottom: 4 }}>Last Name</label>
+              <input
+                required
+                value={addUserForm.last_name}
+                onChange={(e) => setAddUserForm({ ...addUserForm, last_name: e.target.value })}
+                style={{
+                  width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid #d1d5db',
+                  fontSize: 14, fontFamily: 'inherit', boxSizing: 'border-box',
+                }}
+              />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: '#374151', marginBottom: 4 }}>Email</label>
+              <input
+                required
+                type="email"
+                value={addUserForm.email}
+                onChange={(e) => setAddUserForm({ ...addUserForm, email: e.target.value })}
+                style={{
+                  width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid #d1d5db',
+                  fontSize: 14, fontFamily: 'inherit', boxSizing: 'border-box',
+                }}
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={actionLoading === 'add-user'}
+              style={{
+                padding: '8px 20px', borderRadius: 8, border: 'none',
+                background: '#16a34a', color: '#fff', fontSize: 14, fontWeight: 600,
+                cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap',
+                opacity: actionLoading === 'add-user' ? 0.5 : 1,
+              }}
+            >
+              {actionLoading === 'add-user' ? 'Adding...' : 'Add & Activate'}
+            </button>
+          </div>
+          {addUserError && (
+            <div style={{ marginTop: 8, color: '#dc2626', fontSize: 13 }}>{addUserError}</div>
+          )}
+        </form>
+      )}
 
       {/* Stats cards */}
       {stats && (
