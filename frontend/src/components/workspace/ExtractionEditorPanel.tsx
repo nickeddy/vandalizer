@@ -158,6 +158,10 @@ export function ExtractionEditorPanel() {
   const handleRun = async () => {
     if (!openExtractionId || selectedDocUuids.length === 0) return
     setRunning(true)
+    // Bump activity signal now so the side rail starts polling immediately and
+    // picks up the running record the backend creates — otherwise no entry
+    // shows until this sync request returns.
+    bumpActivitySignal()
     try {
       const resp = await runExtractionSync({
         search_set_uuid: openExtractionId,

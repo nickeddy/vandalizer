@@ -20,6 +20,26 @@ interface DocumentViewerProps {
 const ZOOM_LEVELS = [0.5, 0.75, 1, 1.25, 1.5, 2]
 const HIGHLIGHT_COLOR = '#eab308'
 
+// Drive pdfjs's text stream with an explicit reader loop. Avoids
+// `for await..of` on a ReadableStream, which throws on Safari versions
+// lacking ReadableStream[Symbol.asyncIterator].
+async function readTextItems(page: pdfjsLib.PDFPageProxy): Promise<unknown[]> {
+  const stream = (page as unknown as { streamTextContent: () => ReadableStream }).streamTextContent()
+  const reader = stream.getReader()
+  const items: unknown[] = []
+  try {
+    while (true) {
+      const { value, done } = await reader.read()
+      if (done) break
+      const chunkItems = (value as { items?: unknown[] } | undefined)?.items
+      if (chunkItems && chunkItems.length > 0) items.push(...chunkItems)
+    }
+  } finally {
+    try { reader.releaseLock() } catch { /* noop */ }
+  }
+  return items
+}
+
 const STATUS_MESSAGES: Record<string, { title: string; message: string }> = {
   layout: {
     title: 'Converting & Preparing Your Document...',
@@ -158,7 +178,9 @@ export function DocumentViewer({ docUuid, highlightTerms = [], processing, taskS
   // Re-apply highlights when terms change
   useEffect(() => {
     if (isPdf !== true || !pdfDocRef.current) return
-    applyHighlights(pdfDocRef.current, highlightTerms)
+    applyHighlights(pdfDocRef.current, highlightTerms).catch(err => {
+      console.error('[DocumentViewer] applyHighlights failed:', err)
+    })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [highlightTerms])
 
@@ -222,7 +244,9 @@ export function DocumentViewer({ docUuid, highlightTerms = [], processing, taskS
 
     // Apply highlights after rendering
     if (highlightTerms.length > 0) {
-      applyHighlights(doc, highlightTerms)
+      applyHighlights(doc, highlightTerms).catch(err => {
+        console.error('[DocumentViewer] applyHighlights failed:', err)
+      })
     }
   }, [zoomLevel, highlightTerms])
 
@@ -254,14 +278,17 @@ export function DocumentViewer({ docUuid, highlightTerms = [], processing, taskS
     for (let i = 1; i <= doc.numPages; i++) {
       const page = await doc.getPage(i)
       const viewport = page.getViewport({ scale: zoomLevel })
-      const textContent = await page.getTextContent()
+      // pdfjs's built-in getTextContent() uses `for await..of` on a
+      // ReadableStream, which throws on Safari versions that don't implement
+      // ReadableStream[Symbol.asyncIterator]. Drive the stream by hand.
+      const textItems = await readTextItems(page)
       const wrapper = container.querySelector(`[data-page-num="${i}"]`)
       const overlay = wrapper?.querySelector('.pdf-overlay')
       if (!overlay) continue
 
       const items: TextItem[] = []
-      for (const raw of textContent.items) {
-        if ('str' in raw) items.push(raw as TextItem)
+      for (const raw of textItems) {
+        if (raw && typeof raw === 'object' && 'str' in raw) items.push(raw as TextItem)
       }
 
       const charRefs: CharRef[] = []
@@ -350,6 +377,54 @@ export function DocumentViewer({ docUuid, highlightTerms = [], processing, taskS
 
           matchCount++
         }
+      }
+
+      // Also search AcroForm / widget annotations — form-field values don't
+      // appear in the page's text layer, but many extractions pull from them.
+      try {
+        const annotations = await page.getAnnotations()
+        for (const ann of annotations) {
+          const a = ann as { subtype?: string; fieldType?: string; fieldValue?: unknown; rect?: number[] }
+          if (a.subtype !== 'Widget' || a.fieldType !== 'Tx') continue
+          const rawValue = a.fieldValue
+          if (rawValue === undefined || rawValue === null) continue
+          const fieldVal = Array.isArray(rawValue) ? rawValue.join(' ') : String(rawValue)
+          const fieldLower = fieldVal.toLowerCase().replace(/\s+/g, ' ').trim()
+          if (!fieldLower || !a.rect || a.rect.length < 4) continue
+
+          for (const term of terms) {
+            if (!term) continue
+            const termLower = term.toLowerCase().replace(/\s+/g, ' ').trim()
+            if (!termLower || !fieldLower.includes(termLower)) continue
+
+            const [vx1, vy1, vx2, vy2] = viewport.convertToViewportRectangle(a.rect)
+            const left = Math.min(vx1, vx2)
+            const top = Math.min(vy1, vy2)
+            const width = Math.abs(vx2 - vx1)
+            const height = Math.abs(vy2 - vy1)
+            if (width <= 0 || height <= 0) continue
+
+            const hl = document.createElement('div')
+            hl.className = 'pdf-highlight'
+            hl.dataset.highlightIndex = String(matchCount)
+            Object.assign(hl.style, {
+              position: 'absolute',
+              left: `${left}px`,
+              top: `${top}px`,
+              width: `${width}px`,
+              height: `${height}px`,
+              backgroundColor: HIGHLIGHT_COLOR,
+              opacity: '0.45',
+              pointerEvents: 'none',
+              borderRadius: '2px',
+            })
+            overlay.appendChild(hl)
+            matchCount++
+            break // one hit per field is enough
+          }
+        }
+      } catch (err) {
+        console.warn('[DocumentViewer] annotation search failed:', err)
       }
     }
 
