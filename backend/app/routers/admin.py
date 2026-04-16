@@ -257,6 +257,7 @@ class ModelAddRequest(BaseModel):
     supports_structured: bool = True
     multimodal: bool = False
     supports_pdf: bool = False
+    context_window: int = 128000
 
 
 class OAuthProviderRequest(BaseModel):
@@ -265,6 +266,7 @@ class OAuthProviderRequest(BaseModel):
     client_id: str
     client_secret: str
     redirect_uri: Optional[str] = None
+    enabled: bool = True
     tenant_id: Optional[str] = None
     metadata_url: Optional[str] = None
     entity_id: Optional[str] = None
@@ -1295,6 +1297,7 @@ async def add_model(
             "supports_structured": body.supports_structured,
             "multimodal": body.multimodal,
             "supports_pdf": body.supports_pdf,
+            "context_window": body.context_window,
         }
     )
     cfg.updated_at = datetime.datetime.now(datetime.timezone.utc)
@@ -1343,6 +1346,7 @@ async def update_model(
         "supports_structured": body.supports_structured,
         "multimodal": body.multimodal,
         "supports_pdf": body.supports_pdf,
+        "context_window": body.context_window,
     }
     cfg.updated_at = datetime.datetime.now(datetime.timezone.utc)
     cfg.updated_by = user.user_id
