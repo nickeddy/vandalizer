@@ -9,11 +9,13 @@ from bson import ObjectId as BsonObjectId
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
+from app.config import Settings
 from app.dependencies import get_current_user
 from app.models.activity import ActivityEvent
 from app.models.audit_log import AdminAuditLog
 from app.models.system_config import SystemConfig
 from app.services.llm_service import clear_agent_caches, get_agent_model
+from app.services.version_service import get_update_status
 from app.utils.encryption import decrypt_value, encrypt_value
 from app.models.team import Team, TeamMembership
 from app.models.user import User
@@ -1989,3 +1991,15 @@ async def test_model(index: int, user: User = Depends(get_current_user)):
         }
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Model test failed: {e}")
+
+
+# ---------------------------------------------------------------------------
+# Version / update check
+# ---------------------------------------------------------------------------
+
+
+@router.get("/system/version")
+async def get_system_version(user: User = Depends(get_current_user)) -> dict:
+    """Report the running version and whether an upstream release is newer."""
+    await _require_admin(user)
+    return await get_update_status(Settings())

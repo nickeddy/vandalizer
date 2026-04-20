@@ -60,6 +60,7 @@ import type { ApprovalRequest } from '../api/approvals'
 import * as auditApi from '../api/audit'
 import type { AuditLogEntry } from '../api/audit'
 import { getAuthConfig } from '../api/auth'
+import { UpdateBanner } from '../components/admin/UpdateBanner'
 
 function applyThemeToDOM(theme: ThemeConfig) {
   const root = document.documentElement
@@ -5530,6 +5531,7 @@ export default function Admin() {
 
         {/* Content */}
         <div style={{ flex: 1, padding: '20px 32px', minWidth: 0 }}>
+          <UpdateBanner />
           {activeTab === 'usage' && <UsageTab />}
           {activeTab === 'users' && <UsersTab />}
           {activeTab === 'teams' && <TeamsTab />}
