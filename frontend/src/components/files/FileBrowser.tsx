@@ -454,7 +454,7 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
           ref={fileInputRef}
           type="file"
           multiple
-          accept=".pdf,.docx,.xlsx,.xls,.csv"
+          accept=".pdf,.doc,.docx,.xlsx,.xls,.csv,.txt,.md"
           className="hidden"
           onChange={(e) => {
             if (e.target.files?.length) upload(e.target.files)
