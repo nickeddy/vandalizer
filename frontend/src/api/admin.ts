@@ -1,5 +1,20 @@
 import { apiFetch } from './client'
 
+// Version / update check
+
+export interface VersionStatus {
+  current: string
+  latest: string | null
+  update_available: boolean
+  released_at: string | null
+  release_url: string | null
+  check_disabled: boolean
+}
+
+export function getVersionStatus() {
+  return apiFetch<VersionStatus>('/api/admin/system/version')
+}
+
 // Usage
 
 export interface UsageStats {

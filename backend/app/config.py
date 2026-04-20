@@ -61,6 +61,11 @@ class Settings(BaseSettings):
     # Trial / demo system (disabled by default for self-hosters)
     enable_trial_system: bool = False
 
+    # Upstream update check — hits api.github.com once per hour (cached in Redis)
+    # to surface an "update available" banner to admins. Set to True to opt out
+    # for air-gapped or privacy-strict deployments.
+    disable_update_check: bool = False
+
     @model_validator(mode="after")
     def _resolve_paths(self) -> "Settings":
         # Resolve relative paths against the backend directory (parent of app/)
