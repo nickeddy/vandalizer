@@ -569,12 +569,12 @@ export function WorkflowEditorPanel() {
                       </div>
                       {qualityStatus.config_changed && (
                         <div style={{ fontSize: 12, color: '#92400e', marginTop: 4 }}>
-                          Workflow changed since last validation — re-validate for accurate results
+                          Workflow changed since last validation. Re-validate for accurate results.
                         </div>
                       )}
                       {qualityStatus.stale && !qualityStatus.config_changed && (
                         <div style={{ fontSize: 12, color: '#92400e', marginTop: 4 }}>
-                          Last validated over 2 weeks ago — consider re-validating
+                          Last validated over 2 weeks ago. Consider re-validating.
                         </div>
                       )}
                     </div>
@@ -2549,7 +2549,7 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
                   <option value="">Use workflow default</option>
                   {models.map(m => {
                     const hints = [m.speed, m.tier ? `${m.tier} tier` : ''].filter(Boolean).join(', ')
-                    const label = (m.tag || m.name) + (m.external ? ' (External)' : '') + (hints ? ` — ${hints}` : '')
+                    const label = (m.tag || m.name) + (m.external ? ' (External)' : '') + (hints ? ` - ${hints}` : '')
                     return <option key={m.name} value={m.name}>{label}</option>
                   })}
                 </select>
@@ -3067,7 +3067,7 @@ function WorkflowOutputCard({ status, sessionId, running, runElapsed, showDownlo
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 500,
                   color: approval.status === 'approved' ? '#16a34a' : '#dc2626' }}>
                   {approval.status === 'approved'
-                    ? <><CheckCircle style={{ width: 16, height: 16 }} /> Approved — workflow resuming</>
+                    ? <><CheckCircle style={{ width: 16, height: 16 }} /> Approved. Workflow resuming.</>
                     : <><XCircle style={{ width: 16, height: 16 }} /> Rejected</>
                   }
                 </div>
@@ -4698,7 +4698,7 @@ function ValidateTab({
                           }}
                           labelFormatter={(label, payload) => {
                             const item = payload?.[0]?.payload
-                            if (item) return `${label} — Grade ${item.grade} (${item.passed}/${item.passed + item.failed} passed)`
+                            if (item) return `${label} · Grade ${item.grade} (${item.passed}/${item.passed + item.failed} passed)`
                             return label
                           }}
                         />

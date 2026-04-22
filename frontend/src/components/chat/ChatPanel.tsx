@@ -148,10 +148,10 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
       setMessages([{
         role: 'assistant',
         content:
-          "Hi — I'm your Vandalizer assistant. Before I show you around, I'd love to " +
+          "Hi, I'm your Vandalizer assistant. Before I show you around, I'd love to " +
           "know a bit about your work.\n\n" +
           "What kind of documents do you spend the most time processing? " +
-          "Grant proposals, compliance reviews, progress reports — or something else entirely?",
+          "Grant proposals, compliance reviews, progress reports, or something else entirely?",
       }])
     }
   }, [effectiveFirstSession, onboardingLoading, messages.length, setMessages, conversationToLoad])
@@ -529,7 +529,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
                     Your documents stay private
                   </div>
                   <div style={{ fontSize: 12, color: '#6b7280', marginTop: 3, lineHeight: 1.5 }}>
-                    Unlike ChatGPT and Claude, your files never leave your institution's control. You choose the model — if it's a private endpoint, your data never touches a third party.
+                    Unlike ChatGPT and Claude, your files never leave your institution's control. You choose the model. If it's a private endpoint, your data never touches a third party.
                   </div>
                 </div>
               </div>
@@ -552,7 +552,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
                     Workflows you can trust
                   </div>
                   <div style={{ fontSize: 12, color: '#6b7280', marginTop: 3, lineHeight: 1.5 }}>
-                    Every extraction workflow has documented quality metrics. Accuracy, consistency, and edge cases are tested and maintained — you see exactly how well it performs before you trust it.
+                    Every extraction workflow has documented quality metrics. Accuracy, consistency, and edge cases are tested and maintained, so you see exactly how well it performs before you trust it.
                   </div>
                 </div>
               </div>
@@ -575,7 +575,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
                     Built for research administration
                   </div>
                   <div style={{ fontSize: 12, color: '#6b7280', marginTop: 3, lineHeight: 1.5 }}>
-                    Purpose-built for grants, compliance, and institutional documents. Multi-format support, automatic OCR, and team collaboration — not a generic chatbot with a file upload bolted on.
+                    Purpose-built for grants, compliance, and institutional documents. Multi-format support, automatic OCR, and team collaboration, not a generic chatbot with a file upload bolted on.
                   </div>
                 </div>
               </div>

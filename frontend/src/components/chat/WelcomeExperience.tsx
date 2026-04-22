@@ -67,17 +67,17 @@ export function ValueWelcome({ onSwitchToFiles, onSendMessage }: ValueWelcomePro
         <ValueCard
           icon={<Shield size={20} />}
           title="Your documents stay private"
-          description="Unlike ChatGPT, Claude, and other consumer AI tools, your files never leave your institution's control. No data is used for AI training. You choose the model — and if it's a private endpoint, your data never touches a third party."
+          description="Unlike ChatGPT, Claude, and other consumer AI tools, your files never leave your institution's control. No data is used for AI training. You choose the model, and if it's a private endpoint, your data never touches a third party."
         />
         <ValueCard
           icon={<CheckCircle2 size={20} />}
           title="Workflows you can trust"
-          description="Every extraction workflow is validated with documented quality metrics. See exactly how well each workflow performs before you trust it with real decisions — accuracy, consistency, and edge cases are tested and maintained."
+          description="Every extraction workflow is validated with documented quality metrics. See exactly how well each workflow performs before you trust it with real decisions. Accuracy, consistency, and edge cases are tested and maintained."
         />
         <ValueCard
           icon={<Upload size={20} />}
           title="Built for research administration"
-          description="Purpose-built for grants, compliance, and institutional documents — not a generic chatbot with a file upload bolted on. Multi-format support (PDF, Word, Excel, images), automatic OCR, and team collaboration out of the box."
+          description="Purpose-built for grants, compliance, and institutional documents, not a generic chatbot with a file upload bolted on. Multi-format support (PDF, Word, Excel, images), automatic OCR, and team collaboration out of the box."
         />
       </div>
 
@@ -95,7 +95,7 @@ export function ValueWelcome({ onSwitchToFiles, onSendMessage }: ValueWelcomePro
           Ready to get started?
         </div>
         <div style={{ fontSize: 13, color: '#6b7280', lineHeight: 1.5, marginBottom: 14 }}>
-          Upload your first document and see what Vandalizer can do with it — extract data, summarize, classify, or just chat about it.
+          Upload your first document and see what Vandalizer can do with it: extract data, summarize, classify, or just chat about it.
         </div>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
           <button
