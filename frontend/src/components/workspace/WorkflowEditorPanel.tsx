@@ -3222,11 +3222,11 @@ function WorkflowOutputCard({ status, sessionId, running, runElapsed, showDownlo
                 padding: '4px 0',
               }}>
                 {([
-                  { fmt: 'json', label: 'JSON', desc: 'Structured data' },
-                  { fmt: 'csv', label: 'CSV', desc: 'Spreadsheet format' },
+                  { fmt: 'json', label: 'JSON', desc: 'Structured data', parseStructured: false },
+                  { fmt: 'csv', label: 'CSV', desc: 'Spreadsheet format', parseStructured: false },
                   { fmt: 'csv', label: 'CSV (parse structured)', desc: 'Detect JSON/tables in prompt output', parseStructured: true },
-                  { fmt: 'pdf', label: 'PDF', desc: 'Printable report' },
-                  { fmt: 'text', label: 'Plain Text', desc: 'Raw text output' },
+                  { fmt: 'pdf', label: 'PDF', desc: 'Printable report', parseStructured: false },
+                  { fmt: 'text', label: 'Plain Text', desc: 'Raw text output', parseStructured: false },
                 ] as const).map(({ fmt, label, desc, parseStructured }) => (
                   <a
                     key={label}
