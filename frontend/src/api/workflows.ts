@@ -170,8 +170,10 @@ export function getTestStepStatus(taskId: string) {
   return apiFetch<{ status: string; result?: unknown }>(`/api/workflows/steps/test/${taskId}`)
 }
 
-export function downloadResults(sessionId: string, format: string = 'json') {
-  return `/api/workflows/download?session_id=${encodeURIComponent(sessionId)}&format=${format}`
+export function downloadResults(sessionId: string, format: string = 'json', opts?: { parseStructured?: boolean }) {
+  const params = new URLSearchParams({ session_id: sessionId, format })
+  if (opts?.parseStructured) params.set('parse_structured', 'true')
+  return `/api/workflows/download?${params.toString()}`
 }
 
 // Export / Import

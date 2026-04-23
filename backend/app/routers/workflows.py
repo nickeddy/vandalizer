@@ -48,6 +48,59 @@ def _csv_cell(value) -> str:
     return str(value)
 
 
+def _parse_structured_string(text: str):
+    """Best-effort extraction of structured data from a free-form string output.
+
+    Tries, in order: fenced JSON blocks, raw JSON, and GitHub-flavored markdown
+    tables. Returns the parsed value (list/dict) or None if nothing matched.
+    """
+    if not isinstance(text, str):
+        return None
+    stripped = text.strip()
+    if not stripped:
+        return None
+
+    # 1. Fenced code blocks (```json ... ``` or plain ``` ... ```)
+    for match in re.finditer(r"```(?:json|JSON)?\s*\n?(.*?)```", text, re.DOTALL):
+        candidate = match.group(1).strip()
+        if not candidate:
+            continue
+        try:
+            return json.loads(candidate)
+        except (json.JSONDecodeError, ValueError):
+            continue
+
+    # 2. Raw JSON (already attempted upstream, but safe to retry)
+    try:
+        return json.loads(stripped)
+    except (json.JSONDecodeError, ValueError):
+        pass
+
+    # 3. Markdown tables: a header row, a separator row of dashes, then body rows.
+    lines = [ln.rstrip() for ln in text.splitlines()]
+    for i in range(len(lines) - 1):
+        header = lines[i].strip()
+        sep = lines[i + 1].strip()
+        if not (header.startswith("|") and sep.startswith("|")):
+            continue
+        if not re.fullmatch(r"\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?", sep):
+            continue
+        headers = [c.strip() for c in header.strip("|").split("|")]
+        rows: list[dict] = []
+        for body in lines[i + 2:]:
+            body = body.strip()
+            if not body.startswith("|"):
+                break
+            cells = [c.strip() for c in body.strip("|").split("|")]
+            if len(cells) < len(headers):
+                cells += [""] * (len(headers) - len(cells))
+            rows.append({headers[j]: cells[j] for j in range(len(headers))})
+        if rows:
+            return rows
+
+    return None
+
+
 def _strip_markdown(text: str) -> str:
     """Remove common markdown formatting for plain-text output."""
     text = re.sub(r"^#{1,6}\s+", "", text, flags=re.MULTILINE)
@@ -189,6 +242,7 @@ async def poll_step_test(task_id: str, user: User = Depends(get_current_user)):
 async def download_results(
     session_id: str,
     format: str = "json",
+    parse_structured: bool = False,
     user: User = Depends(get_current_user),
 ):
     """Download workflow results in specified format."""
@@ -219,7 +273,10 @@ async def download_results(
             try:
                 data = json.loads(data)
             except (json.JSONDecodeError, ValueError):
-                pass
+                if parse_structured:
+                    parsed = _parse_structured_string(data)
+                    if parsed is not None:
+                        data = parsed
         if isinstance(data, list):
             if data and isinstance(data[0], dict):
                 # Collect keys from ALL items so no columns are missing
