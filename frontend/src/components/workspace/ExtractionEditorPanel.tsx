@@ -1,6 +1,6 @@
 import React, { Fragment, useCallback, useEffect, useRef, useState } from 'react'
 import { ExtractionTutorial } from './ExtractionTutorial'
-import { X, Pencil, Loader2, Copy, Trash2, GripVertical, Plus, ChevronDown, ChevronRight, Play, TrendingUp, Sparkles, FileText, AlertTriangle, Eye, Shield, ShieldCheck, Download } from 'lucide-react'
+import { X, Pencil, Loader2, Copy, Trash2, GripVertical, Plus, ChevronDown, ChevronRight, Play, TrendingUp, Sparkles, FileText, AlertTriangle, Eye, Shield, ShieldCheck, Download, Check } from 'lucide-react'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { useToast } from '../../contexts/ToastContext'
 import { useSearchSetItems } from '../../hooks/useExtractions'
@@ -46,7 +46,7 @@ import DOMPurify from 'dompurify'
 
 marked.setOptions({ breaks: true, gfm: true })
 
-type Tab = 'design' | 'tools' | 'validate' | 'advanced' | 'history'
+type Tab = 'design' | 'tools' | 'validate' | 'advanced' | 'history' | 'api'
 
 interface ExtractionConfig {
   mode?: 'one_pass' | 'two_pass'
@@ -439,7 +439,7 @@ export function ExtractionEditorPanel() {
           flexShrink: 0,
         }}
       >
-        {(['design', 'tools', 'validate', 'advanced', 'history'] as const).map((tab) => {
+        {(['design', 'tools', 'validate', 'advanced', 'history', 'api'] as const).map((tab) => {
           const isActive = activeTab === tab
           // Colored dot for validate tab
           let tabDot: string | null = null
@@ -587,6 +587,9 @@ export function ExtractionEditorPanel() {
             type="extraction"
           />
         )}
+      </div>
+      <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, display: activeTab === 'api' ? undefined : 'none' }}>
+        {openExtractionId && <ApiTab searchSetUuid={openExtractionId} />}
       </div>
 
       {/* Nudge banner for unvalidated items */}
@@ -1664,6 +1667,204 @@ function AdvancedTab({
           </div>
         </>
       )}
+    </div>
+  )
+}
+
+function ApiTab({ searchSetUuid }: { searchSetUuid: string }) {
+  const [lang, setLang] = useState<'python' | 'curl'>('python')
+  const [copied, setCopied] = useState<string | null>(null)
+
+  const baseUrl = window.location.origin
+  const endpoint = `${baseUrl}/api/extractions/run-integrated`
+  const statusEndpoint = `${baseUrl}/api/extractions/status/{activity_id}`
+
+  const copyToClipboard = (text: string, id: string) => {
+    navigator.clipboard.writeText(text)
+    setCopied(id)
+    setTimeout(() => setCopied(null), 2000)
+  }
+
+  const pythonFileSnippet = `import requests
+
+response = requests.post(
+    "${endpoint}",
+    headers={"x-api-key": "YOUR_API_KEY"},
+    data={"search_set_uuid": "${searchSetUuid}"},
+    files=[
+        ("files", ("document.pdf", open("document.pdf", "rb"), "application/pdf")),
+        # Add more files as needed
+    ],
+)
+print(response.json())`
+
+  const pythonDocUuidSnippet = `import requests
+
+response = requests.post(
+    "${endpoint}",
+    headers={"x-api-key": "YOUR_API_KEY"},
+    data={
+        "search_set_uuid": "${searchSetUuid}",
+        "document_uuids": "UUID1,UUID2",
+    },
+)
+print(response.json())`
+
+  const curlFileSnippet = `curl -X POST "${endpoint}" \\
+  -H "x-api-key: YOUR_API_KEY" \\
+  -F "search_set_uuid=${searchSetUuid}" \\
+  -F "files=@document.pdf"`
+
+  const curlDocUuidSnippet = `curl -X POST "${endpoint}" \\
+  -H "x-api-key: YOUR_API_KEY" \\
+  -F "search_set_uuid=${searchSetUuid}" \\
+  -F "document_uuids=UUID1,UUID2"`
+
+  const statusSnippet = lang === 'python'
+    ? `# Check extraction status by activity_id
+response = requests.get(
+    "${baseUrl}/api/extractions/status/ACTIVITY_ID_FROM_RESPONSE",
+    headers={"x-api-key": "YOUR_API_KEY"},
+)
+print(response.json())`
+    : `curl "${baseUrl}/api/extractions/status/ACTIVITY_ID_FROM_RESPONSE" \\
+  -H "x-api-key: YOUR_API_KEY"`
+
+  const responseExample = `{
+  "status": "completed",
+  "activity_id": "...",
+  "results": [
+    { "field_name": "extracted value", ... }
+  ]
+}`
+
+  const codeBlockStyle: React.CSSProperties = {
+    padding: '14px 16px', backgroundColor: '#1a1a2e', borderRadius: 6, fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+    fontSize: 12, color: '#e2e8f0', whiteSpace: 'pre', overflowX: 'auto', lineHeight: 1.6, position: 'relative',
+  }
+
+  const tabStyle = (active: boolean): React.CSSProperties => ({
+    padding: '4px 12px', fontSize: 11, fontWeight: 600, fontFamily: 'inherit',
+    borderRadius: 4, cursor: 'pointer', border: 'none',
+    backgroundColor: active ? '#3b82f6' : '#e5e7eb',
+    color: active ? '#fff' : '#6b7280',
+  })
+
+  return (
+    <div style={{ padding: 24 }}>
+      <div style={{ padding: 16, backgroundColor: '#f9fafb', borderRadius: 8, border: '1px solid #e5e7eb' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+          <label style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>
+            Run this extraction via API
+          </label>
+          <div style={{ display: 'flex', gap: 4 }}>
+            <button onClick={() => setLang('python')} style={tabStyle(lang === 'python')}>Python</button>
+            <button onClick={() => setLang('curl')} style={tabStyle(lang === 'curl')}>cURL</button>
+          </div>
+        </div>
+
+        <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 16, lineHeight: 1.6 }}>
+          Call this extraction directly from any HTTP client — no automation required. The endpoint runs synchronously
+          and returns results in the response. Requires an API key; generate one from <strong>My Account</strong> in
+          the top-right menu. Rate-limited to 10 requests/minute.
+        </div>
+
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>
+            Endpoint
+          </div>
+          <div style={{ ...codeBlockStyle, whiteSpace: 'nowrap' }}>
+            <span style={{ color: '#22d3ee' }}>POST</span>{' '}{endpoint}
+          </div>
+        </div>
+
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>
+            This extraction's UUID
+          </div>
+          <div style={{ ...codeBlockStyle, whiteSpace: 'nowrap' }}>
+            {searchSetUuid}
+          </div>
+        </div>
+
+        <ApiCodeBlock
+          title="Upload files"
+          code={lang === 'python' ? pythonFileSnippet : curlFileSnippet}
+          id="files"
+          copied={copied}
+          onCopy={copyToClipboard}
+          style={codeBlockStyle}
+        />
+
+        <ApiCodeBlock
+          title="Use existing documents"
+          code={lang === 'python' ? pythonDocUuidSnippet : curlDocUuidSnippet}
+          id="docs"
+          copied={copied}
+          onCopy={copyToClipboard}
+          style={codeBlockStyle}
+        />
+
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>
+            Response
+          </div>
+          <div style={codeBlockStyle}>
+            {responseExample}
+          </div>
+        </div>
+
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>
+            Status lookup (optional)
+          </div>
+          <div style={{ ...codeBlockStyle, whiteSpace: 'nowrap', marginBottom: 8 }}>
+            <span style={{ color: '#22d3ee' }}>GET</span>{' '}{statusEndpoint}
+          </div>
+          <ApiCodeBlock
+            title="Check an older run"
+            code={statusSnippet}
+            id="status"
+            copied={copied}
+            onCopy={copyToClipboard}
+            style={codeBlockStyle}
+          />
+        </div>
+
+        <div style={{ fontSize: 11, color: '#9ca3af', lineHeight: 1.6, marginTop: 8 }}>
+          Parameters: <code>search_set_uuid</code> (required), <code>files</code> (optional, multipart uploads),{' '}
+          <code>document_uuids</code> (optional, comma-separated UUIDs of existing documents). At least one of{' '}
+          <code>files</code> or <code>document_uuids</code> must be provided.
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ApiCodeBlock({ title, code, id, copied, onCopy, style }: {
+  title: string; code: string; id: string; copied: string | null;
+  onCopy: (text: string, id: string) => void; style: React.CSSProperties;
+}) {
+  return (
+    <div style={{ marginBottom: 16 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+        <div style={{ fontSize: 11, fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+          {title}
+        </div>
+        <button
+          onClick={() => onCopy(code, id)}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 4, padding: '2px 8px', fontSize: 11,
+            fontWeight: 500, fontFamily: 'inherit', borderRadius: 4, cursor: 'pointer',
+            border: '1px solid #e5e7eb', backgroundColor: '#fff',
+            color: copied === id ? '#16a34a' : '#6b7280',
+          }}
+        >
+          {copied === id ? <Check style={{ width: 12, height: 12 }} /> : <Copy style={{ width: 12, height: 12 }} />}
+          {copied === id ? 'Copied' : 'Copy'}
+        </button>
+      </div>
+      <div style={style}>{code}</div>
     </div>
   )
 }
