@@ -47,9 +47,10 @@ export function LeftPanel() {
       setViewingDoc({ uuid: viewDocumentRequest.uuid, title: viewDocumentRequest.title })
       setSelectedDocUuids([viewDocumentRequest.uuid])
       setSelectedDocNames({ [viewDocumentRequest.uuid]: viewDocumentRequest.title })
+      setHighlightTerms([])
       clearViewDocumentRequest()
     }
-  }, [viewDocumentRequest, clearViewDocumentRequest, setSelectedDocUuids, setSelectedDocNames])
+  }, [viewDocumentRequest, clearViewDocumentRequest, setSelectedDocUuids, setSelectedDocNames, setHighlightTerms])
 
   // Sync processing state to workspace context so ChatPanel can show it
   useEffect(() => {
@@ -159,7 +160,7 @@ export function LeftPanel() {
         <div style={{ paddingLeft: 15, width: 50, flexShrink: 0 }}>
           {viewingDoc && (
             <button
-              onClick={() => { setViewingDoc(null); setSelectedDocUuids([]); setSelectedDocNames({}) }}
+              onClick={() => { setViewingDoc(null); setSelectedDocUuids([]); setSelectedDocNames({}); setHighlightTerms([]) }}
               className="bg-transparent border-0 p-0 cursor-pointer"
             >
               <ArrowLeft className="h-6 w-6 text-white" />
@@ -266,6 +267,7 @@ export function LeftPanel() {
               setViewingDoc(next)
               setSelectedDocUuids([doc.uuid])
               setSelectedDocNames({ [doc.uuid]: doc.title })
+              setHighlightTerms([])
             }}
             onSelectionChange={handleSelectionChange}
             onDocNamesChange={handleDocNamesChange}
