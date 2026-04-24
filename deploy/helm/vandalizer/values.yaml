@@ -1,0 +1,221 @@
+# ============================================================================
+# Vandalizer Helm chart values
+# ============================================================================
+
+nameOverride: ""
+fullnameOverride: ""
+
+# ---------------------------------------------------------------------------
+# Images — set .image.registry via an environment-specific values file
+# (e.g. values-<env>.yaml). Tag defaults to .Chart.AppVersion when blank.
+# ---------------------------------------------------------------------------
+image:
+  registry: ""                    # REQUIRED — set per environment
+  pullPolicy: IfNotPresent
+  pullSecrets: []                 # e.g. [harbor-pull-secret]
+  backend:
+    repository: vandalizer/backend
+    tag: ""
+  frontend:
+    repository: vandalizer/frontend
+    tag: ""
+
+# ---------------------------------------------------------------------------
+# Ingress (ingress-nginx)
+# ---------------------------------------------------------------------------
+ingress:
+  enabled: true
+  className: nginx
+  host: ""                         # REQUIRED — set per environment
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "500m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+  tls:
+    enabled: true
+    secretName: vandalizer-tls
+
+# ---------------------------------------------------------------------------
+# Storage
+# ---------------------------------------------------------------------------
+# Single-node k3s: local-path is the default provisioner. It only advertises
+# ReadWriteOnce, but multiple pods on the SAME node can mount the same
+# local-path volume (it's a hostPath bind mount under the hood). This chart
+# relies on that behavior — DO NOT deploy across multiple nodes without
+# switching to a real RWX provisioner (NFS, Longhorn-RWX, CephFS, etc.)
+# and flipping the PVC accessModes back to ReadWriteMany.
+storage:
+  uploadsClassName: "local-path"
+  # RWO class used for mongo / chromadb StatefulSet volumes. "" = cluster default.
+  rwoClassName: ""
+  uploads:
+    size: 50Gi
+  mongo:
+    size: 20Gi
+  chromadb:
+    size: 20Gi
+
+# ---------------------------------------------------------------------------
+# Secrets — names of pre-existing Secret objects (NOT created by this chart).
+# See README.md for the keys that must be present in each.
+# ---------------------------------------------------------------------------
+secrets:
+  # envFrom source for api + celery pods. Must contain at minimum:
+  #   JWT_SECRET_KEY, CONFIG_ENCRYPTION_KEY
+  # And, if used:
+  #   SMTP_USER, SMTP_PASSWORD, RESEND_API_KEY,
+  #   GRAPH_TOKEN_KEY, GRAPH_CLIENT_STATE_SECRET, GRAPH_NOTIFICATION_URL
+  backendEnvSecret: vandalizer-backend-env
+
+# ---------------------------------------------------------------------------
+# Non-secret backend env (rendered into a ConfigMap, envFrom'd into api+celery).
+# Secret values belong in .Values.secrets.backendEnvSecret, NOT here.
+# ---------------------------------------------------------------------------
+backendEnv:
+  MONGO_DB: vandalizer
+  UPLOAD_DIR: /app/static/uploads
+  ENVIRONMENT: production
+  FRONTEND_URL: ""                # set per env, typically https://<ingress.host>
+  VANDALIZER_BASE_URL: ""         # set per env, typically https://<ingress.host>
+  EMAIL_PROVIDER: smtp
+  SMTP_HOST: ""
+  SMTP_PORT: "587"
+  SMTP_USE_TLS: "false"
+  SMTP_START_TLS: "true"
+  SMTP_FROM_EMAIL: ""
+  SMTP_FROM_NAME: Vandalizer
+  RESEND_FROM_EMAIL: ""
+  RESEND_FROM_NAME: Vandalizer
+  INSIGHT_ENDPOINT: ""
+  ENABLE_TRIAL_SYSTEM: "false"
+
+# ---------------------------------------------------------------------------
+# API (FastAPI / uvicorn)
+# ---------------------------------------------------------------------------
+api:
+  replicas: 2
+  webWorkers: 2
+  service:
+    port: 8001
+  resources:
+    requests:
+      cpu: "500m"
+      memory: 1Gi
+    limits:
+      cpu: "4"
+      memory: 4Gi
+  podAnnotations: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+# ---------------------------------------------------------------------------
+# Celery — one Deployment per queue + a single-replica beat Deployment.
+# Mirrors the queues defined in backend/run_celery.sh.
+# ---------------------------------------------------------------------------
+celery:
+  workers:
+    - name: documents
+      queues: documents
+      concurrency: 8
+      replicas: 1
+      resources:
+        requests: { cpu: "500m", memory: 1Gi }
+        limits:   { cpu: "4",    memory: 4Gi }
+    - name: workflows
+      queues: workflows
+      concurrency: 6
+      replicas: 1
+      resources:
+        requests: { cpu: "500m", memory: 1Gi }
+        limits:   { cpu: "4",    memory: 4Gi }
+    - name: uploads
+      queues: uploads
+      concurrency: 4
+      replicas: 1
+      resources:
+        requests: { cpu: "250m", memory: 512Mi }
+        limits:   { cpu: "2",    memory: 2Gi }
+    - name: passive
+      queues: passive
+      concurrency: 2
+      replicas: 1
+      resources:
+        requests: { cpu: "100m", memory: 256Mi }
+        limits:   { cpu: "1",    memory: 1Gi }
+    - name: default
+      queues: default
+      concurrency: 2
+      replicas: 1
+      resources:
+        requests: { cpu: "100m", memory: 256Mi }
+        limits:   { cpu: "1",    memory: 1Gi }
+  beat:
+    # Beat MUST be a singleton. Do not raise this above 1.
+    replicas: 1
+    resources:
+      requests: { cpu: "50m",  memory: 128Mi }
+      limits:   { cpu: "500m", memory: 512Mi }
+
+# ---------------------------------------------------------------------------
+# Frontend (nginx serving built SPA; proxies /api -> api service)
+# ---------------------------------------------------------------------------
+frontend:
+  replicas: 2
+  service:
+    port: 80
+  resources:
+    requests: { cpu: "50m",  memory: 64Mi }
+    limits:   { cpu: "500m", memory: 256Mi }
+
+# ---------------------------------------------------------------------------
+# MongoDB — single-replica StatefulSet (no replica set, no auth).
+# For HA swap to the MongoDB Community Operator in a later iteration.
+# ---------------------------------------------------------------------------
+mongo:
+  image:
+    repository: mongo
+    tag: "7.0.16"
+  service:
+    port: 27017
+  resources:
+    requests: { cpu: "250m", memory: 512Mi }
+    limits:   { cpu: "2",    memory: 1Gi }
+
+# ---------------------------------------------------------------------------
+# Redis (redis-stack) — cache/broker. Uses emptyDir; data is disposable.
+# ---------------------------------------------------------------------------
+redis:
+  image:
+    repository: redis/redis-stack
+    tag: "7.4.0-v3"
+  service:
+    port: 6379
+  resources:
+    requests: { cpu: "100m", memory: 128Mi }
+    limits:   { cpu: "1",    memory: 512Mi }
+
+# ---------------------------------------------------------------------------
+# ChromaDB — single-replica StatefulSet (0.6.3 is not HA-capable).
+# ---------------------------------------------------------------------------
+chromadb:
+  image:
+    repository: chromadb/chroma
+    tag: "0.6.3"
+  service:
+    port: 8000
+  resources:
+    requests: { cpu: "500m", memory: 1Gi }
+    limits:   { cpu: "2",    memory: 2Gi }
+
+# ---------------------------------------------------------------------------
+# One-off Jobs — disabled by default. Enable per-job with --set, e.g.:
+#   helm upgrade vandalizer . --set jobs.migrate.enabled=true
+# Then delete the Job (kubectl delete job ...) and set back to false.
+# ---------------------------------------------------------------------------
+jobs:
+  bootstrap:        { enabled: false }
+  migrate:          { enabled: false }
+  migrateFiles:     { enabled: false }
+  createAdmin:      { enabled: false, adminEmail: "", adminPassword: "" }
+  setupDefaultTeam: { enabled: false }

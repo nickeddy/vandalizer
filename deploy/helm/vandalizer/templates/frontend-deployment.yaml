@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "vandalizer.fullname" . }}-frontend
+  labels:
+    {{- include "vandalizer.labels" . | nindent 4 }}
+    app.kubernetes.io/component: frontend
+spec:
+  replicas: {{ .Values.frontend.replicas }}
+  selector:
+    matchLabels:
+      {{- include "vandalizer.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: frontend
+  template:
+    metadata:
+      labels:
+        {{- include "vandalizer.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: frontend
+    spec:
+      {{- include "vandalizer.imagePullSecrets" . | nindent 6 }}
+      containers:
+        - name: frontend
+          image: {{ include "vandalizer.frontendImage" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 80
+          env:
+            # The frontend's nginx.conf proxies /api/ to http://api:8001.
+            # Resolve that hostname to the in-cluster api Service.
+            - name: API_UPSTREAM
+              value: {{ include "vandalizer.fullname" . }}-api:{{ .Values.api.service.port }}
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.frontend.resources | nindent 12 }}

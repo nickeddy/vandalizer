@@ -1,0 +1,70 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "vandalizer.fullname" . }}-api
+  labels:
+    {{- include "vandalizer.labels" . | nindent 4 }}
+    app.kubernetes.io/component: api
+spec:
+  replicas: {{ .Values.api.replicas }}
+  selector:
+    matchLabels:
+      {{- include "vandalizer.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: api
+  template:
+    metadata:
+      labels:
+        {{- include "vandalizer.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: api
+      {{- with .Values.api.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      {{- include "vandalizer.imagePullSecrets" . | nindent 6 }}
+      containers:
+        - name: api
+          image: {{ include "vandalizer.backendImage" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8001
+          env:
+            - name: WEB_WORKERS
+              value: {{ .Values.api.webWorkers | quote }}
+            {{- include "vandalizer.backendEnv" . | nindent 12 }}
+          envFrom:
+            {{- include "vandalizer.backendEnvFrom" . | nindent 12 }}
+          volumeMounts:
+            {{- include "vandalizer.uploadsVolumeMount" . | nindent 12 }}
+          startupProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            failureThreshold: 30
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            periodSeconds: 30
+            timeoutSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 5
+          resources:
+            {{- toYaml .Values.api.resources | nindent 12 }}
+      volumes:
+        {{- include "vandalizer.uploadsVolume" . | nindent 8 }}
+      {{- with .Values.api.nodeSelector }}
+      nodeSelector: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.api.tolerations }}
+      tolerations: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.api.affinity }}
+      affinity: {{- toYaml . | nindent 8 }}
+      {{- end }}

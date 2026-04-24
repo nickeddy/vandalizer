@@ -1,0 +1,23 @@
+{{/*
+Bare "api" Service — a compat alias for the frontend container's nginx.conf,
+which hard-codes `proxy_pass http://api:8001;`. The canonical api Service is
+`{{ include "vandalizer.fullname" . }}-api`; this one is identical except for
+the name. Only one release per namespace can own this name.
+*/}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: api
+  labels:
+    {{- include "vandalizer.labels" . | nindent 4 }}
+    app.kubernetes.io/component: api
+    vandalizer.io/role: compat-alias
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: {{ .Values.api.service.port }}
+      targetPort: http
+  selector:
+    {{- include "vandalizer.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: api

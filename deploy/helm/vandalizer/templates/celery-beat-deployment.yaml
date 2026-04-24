@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "vandalizer.fullname" . }}-celery-beat
+  labels:
+    {{- include "vandalizer.labels" . | nindent 4 }}
+    app.kubernetes.io/component: celery-beat
+spec:
+  # MUST be 1. Running multiple beat replicas causes every scheduled task
+  # to be enqueued once per replica.
+  replicas: {{ .Values.celery.beat.replicas }}
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "vandalizer.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: celery-beat
+  template:
+    metadata:
+      labels:
+        {{- include "vandalizer.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: celery-beat
+    spec:
+      {{- include "vandalizer.imagePullSecrets" . | nindent 6 }}
+      containers:
+        - name: beat
+          image: {{ include "vandalizer.backendImage" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["celery"]
+          args:
+            - "-A"
+            - "celery_worker.celery_app"
+            - "beat"
+            - "--loglevel=info"
+          env:
+            {{- include "vandalizer.backendEnv" . | nindent 12 }}
+          envFrom:
+            {{- include "vandalizer.backendEnvFrom" . | nindent 12 }}
+          resources:
+            {{- toYaml .Values.celery.beat.resources | nindent 12 }}

@@ -1,0 +1,31 @@
+Vandalizer {{ .Chart.AppVersion }} installed as release "{{ .Release.Name }}".
+
+Frontend URL:
+  {{- if .Values.ingress.tls.enabled }}
+  https://{{ .Values.ingress.host }}
+  {{- else }}
+  http://{{ .Values.ingress.host }}
+  {{- end }}
+
+Next steps:
+
+1. Verify pods are healthy:
+     kubectl -n {{ .Release.Namespace }} get pods -l app.kubernetes.io/instance={{ .Release.Name }}
+
+2. First-time setup (run once, then disable):
+     helm upgrade {{ .Release.Name }} . \
+       -n {{ .Release.Namespace }} \
+       --set jobs.bootstrap.enabled=true \
+       --set jobs.setupDefaultTeam.enabled=true \
+       --set jobs.createAdmin.enabled=true \
+       --set jobs.createAdmin.adminEmail=you@arizona.edu \
+       --set jobs.createAdmin.adminPassword='REDACTED'
+
+     # Then delete the completed Jobs and flip the flags back to false:
+     kubectl -n {{ .Release.Namespace }} delete job \
+       {{ include "vandalizer.fullname" . }}-bootstrap \
+       {{ include "vandalizer.fullname" . }}-setup-default-team \
+       {{ include "vandalizer.fullname" . }}-create-admin
+
+3. See README.md in the chart for the full list of Secret keys that must
+   exist in the '{{ .Values.secrets.backendEnvSecret }}' Secret.

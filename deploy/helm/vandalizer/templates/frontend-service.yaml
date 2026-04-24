@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "vandalizer.fullname" . }}-frontend
+  labels:
+    {{- include "vandalizer.labels" . | nindent 4 }}
+    app.kubernetes.io/component: frontend
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: {{ .Values.frontend.service.port }}
+      targetPort: http
+  selector:
+    {{- include "vandalizer.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: frontend
