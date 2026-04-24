@@ -1,0 +1,59 @@
+{{- range $worker := .Values.celery.workers }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "vandalizer.fullname" $ }}-celery-{{ $worker.name }}
+  labels:
+    {{- include "vandalizer.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: celery-worker
+    vandalizer.io/queue: {{ $worker.name }}
+spec:
+  replicas: {{ $worker.replicas | default 1 }}
+  selector:
+    matchLabels:
+      {{- include "vandalizer.selectorLabels" $ | nindent 6 }}
+      app.kubernetes.io/component: celery-worker
+      vandalizer.io/queue: {{ $worker.name }}
+  template:
+    metadata:
+      labels:
+        {{- include "vandalizer.selectorLabels" $ | nindent 8 }}
+        app.kubernetes.io/component: celery-worker
+        vandalizer.io/queue: {{ $worker.name }}
+    spec:
+      {{- include "vandalizer.imagePullSecrets" $ | nindent 6 }}
+      containers:
+        - name: celery
+          image: {{ include "vandalizer.backendImage" $ }}
+          imagePullPolicy: {{ $.Values.image.pullPolicy }}
+          command: ["celery"]
+          args:
+            - "-A"
+            - "celery_worker.celery_app"
+            - "worker"
+            - "--queues={{ $worker.queues }}"
+            - "--concurrency={{ $worker.concurrency }}"
+            - "--hostname={{ $worker.name }}@%h"
+            - "--loglevel=info"
+          env:
+            {{- include "vandalizer.backendEnv" $ | nindent 12 }}
+          envFrom:
+            {{- include "vandalizer.backendEnvFrom" $ | nindent 12 }}
+          volumeMounts:
+            {{- include "vandalizer.uploadsVolumeMount" $ | nindent 12 }}
+          livenessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - 'celery -A celery_worker.celery_app inspect ping -d {{ $worker.name }}@$HOSTNAME | grep -q pong'
+            initialDelaySeconds: 60
+            periodSeconds: 60
+            timeoutSeconds: 15
+            failureThreshold: 3
+          resources:
+            {{- toYaml $worker.resources | nindent 12 }}
+      volumes:
+        {{- include "vandalizer.uploadsVolume" $ | nindent 8 }}
+{{- end }}

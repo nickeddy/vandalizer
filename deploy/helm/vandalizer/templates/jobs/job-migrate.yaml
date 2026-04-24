@@ -1,0 +1,3 @@
+{{- if .Values.jobs.migrate.enabled }}
+{{- include "vandalizer.oneOffJob" (dict "root" . "name" "migrate" "command" (list "migrate.py")) }}
+{{- end }}

@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "vandalizer.fullname" . }}-uploads
+  labels:
+    {{- include "vandalizer.labels" . | nindent 4 }}
+spec:
+  # Single-node k3s with local-path: RWO. The api pod and every celery worker
+  # pod will co-mount this volume; k8s permits that as long as they all land
+  # on the same node (guaranteed on single-node clusters).
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: {{ .Values.storage.uploadsClassName | quote }}
+  resources:
+    requests:
+      storage: {{ .Values.storage.uploads.size }}

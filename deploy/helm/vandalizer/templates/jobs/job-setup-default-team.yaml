@@ -1,0 +1,3 @@
+{{- if .Values.jobs.setupDefaultTeam.enabled }}
+{{- include "vandalizer.oneOffJob" (dict "root" . "name" "setup-default-team" "command" (list "setup_default_team.py")) }}
+{{- end }}

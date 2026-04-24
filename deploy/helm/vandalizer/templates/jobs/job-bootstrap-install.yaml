@@ -1,0 +1,3 @@
+{{- if .Values.jobs.bootstrap.enabled }}
+{{- include "vandalizer.oneOffJob" (dict "root" . "name" "bootstrap" "command" (list "bootstrap_install.py")) }}
+{{- end }}

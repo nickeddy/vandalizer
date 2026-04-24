@@ -1,0 +1,7 @@
+apiVersion: v2
+name: vandalizer
+description: AI-powered document intelligence platform (FastAPI + React + Celery + MongoDB + Redis + ChromaDB)
+type: application
+version: 0.1.0
+appVersion: "v2026.04.1"
+kubeVersion: ">=1.24.0-0"
