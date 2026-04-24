@@ -6,10 +6,13 @@ metadata:
   name: {{ include "vandalizer.fullname" . }}
   labels:
     {{- include "vandalizer.labels" . | nindent 4 }}
-  {{- with .Values.ingress.annotations }}
   annotations:
+    {{- if .Values.ingress.bodyLimit.enabled }}
+    traefik.ingress.kubernetes.io/router.middlewares: {{ printf "%s-%s-buffering@kubernetescrd" .Release.Namespace (include "vandalizer.fullname" .) }}
+    {{- end }}
+    {{- with .Values.ingress.annotations }}
     {{- toYaml . | nindent 4 }}
-  {{- end }}
+    {{- end }}
 spec:
   ingressClassName: {{ .Values.ingress.className }}
   {{- if .Values.ingress.tls.enabled }}

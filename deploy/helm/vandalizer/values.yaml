@@ -21,19 +21,28 @@ image:
     tag: ""
 
 # ---------------------------------------------------------------------------
-# Ingress (ingress-nginx)
+# Ingress (Traefik — bundled with k3s)
+#
+# Request timeouts (read/send/idle) are an entrypoint-level setting in Traefik,
+# NOT a per-Ingress annotation. If long-running API calls time out at the
+# proxy, raise `ports.web/websecure.transport.respondingTimeouts` on the
+# Traefik install itself — this chart can't set it.
 # ---------------------------------------------------------------------------
 ingress:
   enabled: true
-  className: nginx
+  className: traefik
   host: ""                         # REQUIRED — set per environment
-  annotations:
-    nginx.ingress.kubernetes.io/proxy-body-size: "500m"
-    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
-    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+  annotations: {}
   tls:
     enabled: true
     secretName: vandalizer-tls
+  # Traefik Buffering middleware — raises the default 1 MiB request-body cap
+  # so uploads and large extraction payloads go through. Requires the Traefik
+  # CRDs (shipped with the standard Traefik install, including k3s default).
+  # Disable if you don't have the CRDs; Traefik will fall back to its default.
+  bodyLimit:
+    enabled: true
+    maxRequestBodyBytes: 524288000   # 500 MiB, matches the prior nginx cap
 
 # ---------------------------------------------------------------------------
 # Storage
