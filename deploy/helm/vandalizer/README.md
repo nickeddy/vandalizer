@@ -21,7 +21,14 @@ set: `image.registry`, `image.pullSecrets`, `ingress.host`,
 ## Prerequisites
 
 - Kubernetes >= 1.24 (tested target: **single-node k3s**)
-- ingress-nginx installed and exposing your chosen Ingress host
+- Traefik installed and exposing your chosen Ingress host. k3s ships Traefik
+  by default, so a stock k3s cluster satisfies this out of the box. The
+  chart sets `ingressClassName: traefik` and applies a Traefik `Middleware`
+  (buffering) to raise the request-body cap — the Traefik CRDs must be
+  present (they are, with the standard k3s install). Request timeouts are
+  an **entrypoint-level** Traefik setting (`respondingTimeouts`), not a
+  per-Ingress annotation — if long-running API calls time out at the proxy,
+  raise them on the Traefik install itself.
 - A StorageClass for the shared `uploads` PVC. Default is `local-path`
   (k3s built-in). The PVC is RWO but is mounted by the api pod *and* every
   celery worker pod — this is only safe when all of those pods land on the
