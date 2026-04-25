@@ -10,6 +10,9 @@ metadata:
     {{- if .Values.ingress.bodyLimit.enabled }}
     traefik.ingress.kubernetes.io/router.middlewares: {{ printf "%s-%s-buffering@kubernetescrd" .Release.Namespace (include "vandalizer.fullname" .) }}
     {{- end }}
+    {{- if .Values.certManager.enabled }}
+    cert-manager.io/cluster-issuer: {{ required "certManager.clusterIssuer is required when certManager.enabled is true" .Values.certManager.clusterIssuer | quote }}
+    {{- end }}
     {{- with .Values.ingress.annotations }}
     {{- toYaml . | nindent 4 }}
     {{- end }}

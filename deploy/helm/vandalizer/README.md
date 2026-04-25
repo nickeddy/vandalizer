@@ -35,9 +35,11 @@ set: `image.registry`, `image.pullSecrets`, `ingress.host`,
   **same node** (guaranteed on a single-node cluster). If you ever expand
   to multi-node, switch to a real RWX class (NFS, Longhorn-RWX, etc.) and
   flip the PVC accessMode back to `ReadWriteMany`.
-- A TLS Secret for your Ingress host in the target namespace (default name:
-  `vandalizer-tls`). If you use cert-manager, annotate the Ingress instead
-  and set `ingress.tls.secretName` to the cert-manager target.
+- **cert-manager** installed in the cluster and a Let's Encrypt `ClusterIssuer`
+  applied (see *TLS via cert-manager + Let's Encrypt* below). The chart
+  annotates the Ingress with `cert-manager.io/cluster-issuer`, and
+  cert-manager auto-populates the Secret named in `ingress.tls.secretName`
+  (default `vandalizer-tls`) — no manual cert / key wrangling required.
 - An image pull Secret in the target namespace for your container registry
   (default name: `harbor-pull-secret`, overridable via
   `.Values.image.pullSecrets`).
@@ -91,15 +93,64 @@ kubectl -n vandalizer create secret docker-registry harbor-pull-secret \
   --docker-username=<user> \
   --docker-password=<pass>
 
-# 4. TLS Secret for the Ingress host (or use cert-manager)
-kubectl -n vandalizer create secret tls vandalizer-tls \
-  --cert=<path/to/cert.pem> --key=<path/to/key.pem>
+# 4. TLS — nothing to do here if cert-manager + the Let's Encrypt
+#    ClusterIssuer are already applied cluster-wide (see the TLS section
+#    below). cert-manager will create the `vandalizer-tls` Secret on first
+#    reconcile, typically within ~30s-2min of the Ingress becoming ready.
 
 # 5. Install the chart with your environment overlay
 helm upgrade --install vandalizer ./deploy/helm/vandalizer \
   -n vandalizer \
   -f <path/to/values-<env>.yaml>
 ```
+
+## TLS via cert-manager + Let's Encrypt
+
+TLS certs are issued automatically by cert-manager using the Let's Encrypt
+HTTP-01 challenge, served through Traefik. The chart renders both
+`letsencrypt-staging` and `letsencrypt-prod` ClusterIssuers when
+`certManager.installIssuer` is true (default), and annotates the Ingress so
+cert-manager populates the `vandalizer-tls` Secret automatically.
+
+One-time cluster setup:
+
+```bash
+# Install cert-manager (once per cluster)
+helm repo add jetstack https://charts.jetstack.io
+helm install cert-manager jetstack/cert-manager \
+  -n cert-manager --create-namespace \
+  --set installCRDs=true
+```
+
+In your environment overlay, set a real contact email — Let's Encrypt uses
+it for expiry nags and account recovery. The chart will refuse to render
+without it:
+
+```yaml
+# values-<env>.yaml
+certManager:
+  acmeEmail: ops@example.com    # required
+  clusterIssuer: letsencrypt-staging   # default; flip to prod after verifying
+```
+
+The chart defaults to `letsencrypt-staging` so first installs hit the Let's
+Encrypt staging environment (high rate limits, untrusted certs — good for
+verifying plumbing). Once you've confirmed staging issues a cert, flip the
+overlay to `letsencrypt-prod` and `helm upgrade`; cert-manager will
+request a fresh prod cert and overwrite the `vandalizer-tls` Secret.
+
+Note: `ClusterIssuer` is a cluster-scoped resource, so the chart assumes
+**one Vandalizer release per cluster**. If you ever run a second release
+on the same cluster, set `certManager.installIssuer: false` on it (and on
+any release that shouldn't own the issuers) to avoid Helm ownership
+conflicts on the shared `letsencrypt-staging` / `letsencrypt-prod` names.
+
+Requirements for HTTP-01 to succeed:
+
+- Port 80 on the Traefik entrypoint reachable from the public internet.
+- The Ingress host (`ingress.host`) resolves publicly to the cluster.
+- cert-manager is installed and the `ClusterIssuer` is `Ready`
+  (`kubectl get clusterissuer`).
 
 ## First-time bootstrap
 

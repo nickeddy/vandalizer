@@ -45,6 +45,30 @@ ingress:
     maxRequestBodyBytes: 524288000   # 500 MiB, matches the prior nginx cap
 
 # ---------------------------------------------------------------------------
+# TLS via cert-manager + Let's Encrypt.
+#
+# When `enabled`, the Ingress gets a cert-manager.io/cluster-issuer annotation
+# and cert-manager auto-populates the Secret named in .ingress.tls.secretName.
+#
+# When `installIssuer` is true (default), this chart also renders BOTH
+# `letsencrypt-staging` and `letsencrypt-prod` ClusterIssuers (HTTP-01 via
+# Traefik) using the email below. ClusterIssuers are cluster-scoped, so this
+# pattern assumes ONE Vandalizer release per cluster — flip `installIssuer`
+# to false on additional releases (or to manage the issuers out-of-band).
+#
+# Default `clusterIssuer` is `letsencrypt-staging` so first installs don't
+# hammer the production rate limits. Flip to `letsencrypt-prod` via the
+# environment overlay once staging issuance is verified.
+# ---------------------------------------------------------------------------
+certManager:
+  enabled: true
+  clusterIssuer: letsencrypt-staging
+  installIssuer: true
+  # REQUIRED when installIssuer is true — Let's Encrypt uses this for expiry
+  # nags and account recovery. Prefer a team alias over a personal inbox.
+  acmeEmail: ""
+
+# ---------------------------------------------------------------------------
 # Storage
 # ---------------------------------------------------------------------------
 # Single-node k3s: local-path is the default provisioner. It only advertises
