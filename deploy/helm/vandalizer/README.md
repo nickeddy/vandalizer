@@ -84,8 +84,8 @@ kubectl create namespace vandalizer
 
 # 2. Backend-env Secret (plain example; adapt for sealed/external-secrets)
 kubectl -n vandalizer create secret generic vandalizer-backend-env \
-  --from-literal=JWT_SECRET_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(64))')" \
-  --from-literal=CONFIG_ENCRYPTION_KEY="$(python -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())')"
+  --from-literal=JWT_SECRET_KEY="$(python3 -c 'import secrets; print(secrets.token_urlsafe(64))')" \
+  --from-literal=CONFIG_ENCRYPTION_KEY="$(python3 -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())')"
 
 # 3. Image pull Secret (skip if already present)
 kubectl -n vandalizer create secret docker-registry harbor-pull-secret \
@@ -159,33 +159,37 @@ explicitly, wait for completion, then flip the flags back off and delete the
 completed Jobs.
 
 ```bash
-# Enable bootstrap + default-team jobs
+# Enable create-admin + default-team jobs (set values inline or in values-<env>.yaml)
 helm upgrade vandalizer ./deploy/helm/vandalizer -n vandalizer \
   -f <path/to/values-<env>.yaml> \
-  --set jobs.bootstrap.enabled=true \
-  --set jobs.setupDefaultTeam.enabled=true
+  --set jobs.createAdmin.enabled=true \
+  --set jobs.createAdmin.adminEmail=admin@example.edu \
+  --set jobs.createAdmin.adminPassword='change-me' \
+  --set jobs.setupDefaultTeam.enabled=true \
+  --set jobs.setupDefaultTeam.teamName='Research Administration' \
+  --set jobs.setupDefaultTeam.adminEmail=admin@example.edu
 
 # Wait for them to complete
 kubectl -n vandalizer wait --for=condition=complete --timeout=10m \
-  job/vandalizer-bootstrap job/vandalizer-setup-default-team
+  job/vandalizer-create-admin job/vandalizer-setup-default-team
 
 # Turn the flags back off and clean up
 helm upgrade vandalizer ./deploy/helm/vandalizer -n vandalizer \
   -f <path/to/values-<env>.yaml> \
-  --set jobs.bootstrap.enabled=false \
+  --set jobs.createAdmin.enabled=false \
   --set jobs.setupDefaultTeam.enabled=false
-kubectl -n vandalizer delete job vandalizer-bootstrap vandalizer-setup-default-team
+kubectl -n vandalizer delete job vandalizer-create-admin vandalizer-setup-default-team
 ```
 
 The same enable → wait → disable → delete pattern applies to every one-off job.
 
 Available one-off jobs:
 
-- `jobs.bootstrap`         → runs `python bootstrap_install.py`
+- `jobs.bootstrap`         → runs `python bootstrap_install.py` (all-in-one alternative to `createAdmin` + `setupDefaultTeam`; not currently wired to pass env — use the two-step path below)
 - `jobs.migrate`           → runs `python migrate.py`
 - `jobs.migrateFiles`      → runs `python migrate_files.py`
-- `jobs.setupDefaultTeam`  → runs `python setup_default_team.py`
-- `jobs.createAdmin`       → runs `python create_admin.py` (needs `jobs.createAdmin.adminEmail`, `jobs.createAdmin.adminPassword`)
+- `jobs.createAdmin`       → runs `python create_admin.py` (needs `jobs.createAdmin.adminEmail`, `jobs.createAdmin.adminPassword`; optional `jobs.createAdmin.adminName`)
+- `jobs.setupDefaultTeam`  → runs `python setup_default_team.py` (needs `jobs.setupDefaultTeam.teamName`, `jobs.setupDefaultTeam.adminEmail`; admin must already exist — run `createAdmin` first)
 
 ## Known limitations
 

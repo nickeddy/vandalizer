@@ -1,7 +1,8 @@
 {{- if .Values.jobs.createAdmin.enabled }}
 {{- $extraEnv := list
-      (dict "name" "ADMIN_EMAIL"    "value" .Values.jobs.createAdmin.adminEmail)
-      (dict "name" "ADMIN_PASSWORD" "value" .Values.jobs.createAdmin.adminPassword)
+      (dict "name" "ADMIN_EMAIL"    "value" (required "jobs.createAdmin.adminEmail is required when jobs.createAdmin.enabled is true"    .Values.jobs.createAdmin.adminEmail))
+      (dict "name" "ADMIN_PASSWORD" "value" (required "jobs.createAdmin.adminPassword is required when jobs.createAdmin.enabled is true" .Values.jobs.createAdmin.adminPassword))
+      (dict "name" "ADMIN_NAME"     "value" .Values.jobs.createAdmin.adminName)
 }}
 {{- include "vandalizer.oneOffJob" (dict "root" . "name" "create-admin" "command" (list "create_admin.py") "extraEnv" $extraEnv) }}
 {{- end }}

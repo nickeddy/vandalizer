@@ -250,5 +250,5 @@ jobs:
   bootstrap:        { enabled: false }
   migrate:          { enabled: false }
   migrateFiles:     { enabled: false }
-  createAdmin:      { enabled: false, adminEmail: "", adminPassword: "" }
-  setupDefaultTeam: { enabled: false }
+  createAdmin:      { enabled: false, adminEmail: "", adminPassword: "", adminName: "Admin" }
+  setupDefaultTeam: { enabled: false, teamName: "", adminEmail: "" }

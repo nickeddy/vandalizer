@@ -1,3 +1,7 @@
 {{- if .Values.jobs.setupDefaultTeam.enabled }}
-{{- include "vandalizer.oneOffJob" (dict "root" . "name" "setup-default-team" "command" (list "setup_default_team.py")) }}
+{{- $extraEnv := list
+      (dict "name" "TEAM_NAME"   "value" (required "jobs.setupDefaultTeam.teamName is required when jobs.setupDefaultTeam.enabled is true"   .Values.jobs.setupDefaultTeam.teamName))
+      (dict "name" "ADMIN_EMAIL" "value" (required "jobs.setupDefaultTeam.adminEmail is required when jobs.setupDefaultTeam.enabled is true" .Values.jobs.setupDefaultTeam.adminEmail))
+}}
+{{- include "vandalizer.oneOffJob" (dict "root" . "name" "setup-default-team" "command" (list "setup_default_team.py") "extraEnv" $extraEnv) }}
 {{- end }}
