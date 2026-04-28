@@ -1,0 +1,8 @@
+{{- if .Values.jobs.createUser.enabled }}
+{{- $extraEnv := list
+      (dict "name" "USER_EMAIL"    "value" (required "jobs.createUser.email is required when jobs.createUser.enabled is true"    .Values.jobs.createUser.email))
+      (dict "name" "USER_PASSWORD" "value" (required "jobs.createUser.password is required when jobs.createUser.enabled is true" .Values.jobs.createUser.password))
+      (dict "name" "USER_NAME"     "value" .Values.jobs.createUser.name)
+}}
+{{- include "vandalizer.oneOffJob" (dict "root" . "name" "create-user" "command" (list "create_user.py") "extraEnv" $extraEnv) }}
+{{- end }}

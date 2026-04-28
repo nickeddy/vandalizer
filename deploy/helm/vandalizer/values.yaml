@@ -43,6 +43,13 @@ ingress:
   bodyLimit:
     enabled: true
     maxRequestBodyBytes: 524288000   # 500 MiB, matches the prior nginx cap
+  # Block direct POST to /api/auth/register at the proxy. Use when an upstream
+  # IdP (e.g. Authentik) gates signups — leaves the public registration endpoint
+  # unreachable so users must go through the IdP. Implemented as a Traefik
+  # IngressRoute that routes matching requests to an ipAllowList middleware
+  # whose only allowed range (0.0.0.0/32) matches no real client → 403.
+  blockRegistration:
+    enabled: false
 
 # ---------------------------------------------------------------------------
 # TLS via cert-manager + Let's Encrypt.
@@ -251,4 +258,5 @@ jobs:
   migrate:          { enabled: false }
   migrateFiles:     { enabled: false }
   createAdmin:      { enabled: false, adminEmail: "", adminPassword: "", adminName: "Admin" }
+  createUser:       { enabled: false, email: "", password: "", name: "" }
   setupDefaultTeam: { enabled: false, teamName: "", adminEmail: "" }
