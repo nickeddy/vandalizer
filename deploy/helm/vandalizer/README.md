@@ -189,6 +189,7 @@ Available one-off jobs:
 - `jobs.migrate`           → runs `python migrate.py`
 - `jobs.migrateFiles`      → runs `python migrate_files.py`
 - `jobs.createAdmin`       → runs `python create_admin.py` (needs `jobs.createAdmin.adminEmail`, `jobs.createAdmin.adminPassword`; optional `jobs.createAdmin.adminName`)
+- `jobs.createUser`        → runs `python create_user.py` (needs `jobs.createUser.email`, `jobs.createUser.password`; optional `jobs.createUser.name`) — for non-admin users
 - `jobs.setupDefaultTeam`  → runs `python setup_default_team.py` (needs `jobs.setupDefaultTeam.teamName`, `jobs.setupDefaultTeam.adminEmail`; admin must already exist — run `createAdmin` first)
 
 ## Known limitations

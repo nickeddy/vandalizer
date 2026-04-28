@@ -1,0 +1,33 @@
+{{- if and .Values.ingress.enabled .Values.ingress.blockRegistration.enabled }}
+{{- $host := required "ingress.host is required when ingress.blockRegistration.enabled is true" .Values.ingress.host -}}
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: {{ include "vandalizer.fullname" . }}-deny-all
+  labels:
+    {{- include "vandalizer.labels" . | nindent 4 }}
+spec:
+  ipAllowList:
+    sourceRange:
+      - 0.0.0.0/32
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: {{ include "vandalizer.fullname" . }}-block-register
+  labels:
+    {{- include "vandalizer.labels" . | nindent 4 }}
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`{{ $host }}`) && Method(`POST`) && PathPrefix(`/api/auth/register`)
+      kind: Rule
+      priority: 1000
+      middlewares:
+        - name: {{ include "vandalizer.fullname" . }}-deny-all
+      services:
+        - name: {{ include "vandalizer.fullname" . }}-frontend
+          port: {{ .Values.frontend.service.port }}
+{{- end }}
