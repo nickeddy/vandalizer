@@ -15,6 +15,7 @@ from typing import List, Literal, Optional, Union
 
 from pydantic import BaseModel, ConfigDict, Field, create_model, model_validator
 from pydantic_ai import Agent, BinaryContent
+from pydantic_ai.output import ToolOutput
 from app.services._json_schema_utils import inline_defs
 
 from app.models.system_config import DEFAULT_EXTRACTION_CONFIG, _deep_merge
@@ -700,11 +701,20 @@ class ExtractionEngine:
                 extra_body["structured_outputs"] = {"json": schema}
                 model_settings["extra_body"] = extra_body
 
+            # LiteLLM proxies don't reliably forward response_format=json_schema
+            # to all backends (notably Bedrock-Anthropic). Force tool-use mode
+            # via ToolOutput — works on every Anthropic/OpenAI-style backend.
+            output_spec = (
+                ToolOutput(ExtractionModel, name="submit_extraction")
+                if api_protocol == "litellm"
+                else ExtractionModel
+            )
+
             model = get_agent_model(model_name, thinking_override=thinking_override, system_config_doc=self._sys_cfg)
             agent = Agent(
                 model,
                 system_prompt=system_prompt,
-                output_type=ExtractionModel,
+                output_type=output_spec,
                 retries=structured_retries,
                 output_retries=structured_retries,
             )

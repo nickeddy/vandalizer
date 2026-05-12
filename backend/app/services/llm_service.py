@@ -153,7 +153,7 @@ def _get_model_endpoint_sync(model_name: str, system_config_doc: dict | None = N
     return ""
 
 
-SUPPORTED_PROTOCOLS = ("openai", "ollama", "vllm", "anthropic", "openrouter")
+SUPPORTED_PROTOCOLS = ("openai", "ollama", "vllm", "anthropic", "openrouter", "litellm")
 
 
 def detect_api_protocol(model_name: str, model_config: Optional[dict] = None) -> str:
@@ -166,6 +166,8 @@ def detect_api_protocol(model_name: str, model_config: Optional[dict] = None) ->
     model_lower = model_name.lower()
     if model_name.startswith("openrouter/"):
         return "openrouter"
+    if model_name.startswith("litellm/"):
+        return "litellm"
     if "openai/" in model_name or model_name.startswith("gpt-") or "claude" in model_lower:
         return "openai"
     if "/" not in model_name and not model_name.startswith("http"):
@@ -209,6 +211,10 @@ def build_thinking_model_settings(
         what Qwen3, DeepSeek-R1, etc. read when served via vLLM — safe
         unknown-field passthrough on most OpenAI-compatible gateways)
       - Ollama: `think`
+      - LiteLLM proxy: map to OpenAI-style `reasoning_effort` so LiteLLM can
+        translate to the backend's native reasoning control (Bedrock-Anthropic
+        `reasoning_config`, Vertex, etc.). vLLM-style `chat_template_kwargs`
+        would be forwarded to the backend and rejected.
     We skip `chat_template_kwargs` only for truly external OpenAI-protocol
     models (external=true + api_protocol=openai), since the canonical OpenAI
     API can reject unknown fields and has its own reasoning controls.
@@ -220,6 +226,17 @@ def build_thinking_model_settings(
     # the chat_template_kwargs signal for Qwen3 on vLLM-backed endpoints.
     raw_protocol = (model_config.get("api_protocol", "") if model_config else "").strip().lower()
     is_external = bool(model_config and model_config.get("external", False))
+
+    if raw_protocol == "litellm":
+        # LiteLLM proxies translate canonical OpenAI fields to provider-native
+        # shapes. Send reasoning_effort (canonical OpenAI) when thinking is on;
+        # leave both reasoning_effort and the unified `thinking` flag unset
+        # otherwise — pydantic-ai would map thinking=False to reasoning_effort=
+        # 'none', which non-reasoning backends behind LiteLLM reject.
+        settings: dict = {}
+        if thinking_enabled:
+            settings["openai_reasoning_effort"] = "medium"
+        return settings
 
     settings: dict = {"thinking": thinking_enabled}
     extra_body: dict = {}
@@ -292,6 +309,19 @@ def get_agent_model(
     # Handle external models with OpenAI protocol (use OpenAI SDK directly)
     if model_config and model_config.get("external", False) and api_protocol == "openai":
         model_name = agent_model.split("/")[-1] if "/" in agent_model else agent_model
+        from openai import AsyncOpenAI
+        client_kwargs: dict = {"api_key": api_key, "timeout": 120.0}
+        if endpoint:
+            client_kwargs["base_url"] = endpoint
+        client = AsyncOpenAI(**client_kwargs)
+        return OpenAIModel(model_name=model_name, openai_client=client)
+
+    # LiteLLM proxy — speak canonical OpenAI to the proxy and let it translate
+    # to the backend (Bedrock, Vertex, Azure, etc.). Strips a leading "litellm/"
+    # prefix so admins can disambiguate identical model labels across providers;
+    # full slugs like "bedrock/anthropic.claude-3-5-sonnet" pass through intact.
+    if api_protocol == "litellm":
+        model_name = agent_model.split("/", 1)[1] if agent_model.startswith("litellm/") else agent_model
         from openai import AsyncOpenAI
         client_kwargs: dict = {"api_key": api_key, "timeout": 120.0}
         if endpoint:

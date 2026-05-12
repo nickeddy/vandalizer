@@ -2830,6 +2830,7 @@ function ConfigTab() {
                     <option value="openai">OpenAI</option>
                     <option value="anthropic">Anthropic</option>
                     <option value="openrouter">OpenRouter</option>
+                    <option value="litellm">LiteLLM</option>
                     <option value="ollama">Ollama</option>
                     <option value="vllm">VLLM</option>
                   </select>
